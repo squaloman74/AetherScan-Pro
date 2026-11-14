@@ -1,0 +1,15 @@
+{
+  "name": "aetherscan-pro",
+  "version": "1.0.0",
+  "description": "AetherScan Pro v26 Beta 1 — Professional Digital Radio Scanner & Spirit Box",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron . --disable-gpu-shader-disk-cache --disable-http-cache",
+    "dev": "electron . --dev --disable-gpu-shader-disk-cache"
+  },
+  "author": "AetherScan Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.3.3"
+  }
+}

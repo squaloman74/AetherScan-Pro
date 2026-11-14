@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AetherScan Pro v26 Beta 4</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ══════════════════════ HEADER ══════════════════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <!-- Logo Ufficiale Circolare Radar del Progetto -->
+      <img src="icon.png" alt="AetherScan Logo" class="brand-radar-logo" width="32" height="32" />
+      <div class="brand-title">AetherScan <span class="brand-title-pro">Pro</span> <span class="version-badge">v26 Beta 4</span></div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="nav-bar">
+      <div class="nav-item active" data-tab="scanner" id="nav-scanner">SCANNER</div>
+      <div class="nav-item" data-tab="archivio" id="nav-archivio">ARCHIVIO</div>
+      <div class="nav-item" data-tab="analisi" id="nav-analisi">ANALISI</div>
+      <div class="nav-item" data-tab="impostazioni" id="nav-impostazioni">IMPOSTAZIONI</div>
+    </nav>
+
+    <!-- Header Right: Sistema Online + Tasti Finestra -->
+    <div class="header-right">
+      <div class="status-online">
+        <span class="online-dot"></span>
+        <span class="online-text">SISTEMA ONLINE</span>
+      </div>
+      <div class="window-btns">
+        <button class="win-btn" id="btn-minimize">─</button>
+        <button class="win-btn" id="btn-maximize">□</button>
+        <button class="win-btn btn-close" id="btn-close">✕</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════ TAB SCANNER ══════════════════════ -->
+  <main class="main-body tab-content active" id="tab-scanner">
+    <!-- COLONNA SINISTRA -->
+    <section class="col-left">
+      <!-- MODALITÀ -->
+      <div class="panel-box mode-panel">
+        <div class="panel-title">MODALITÀ</div>
+        <div class="mode-row">
+          <div class="mode-item" id="mode-am">
+            <span class="radio-ring"><span class="radio-dot"></span></span>
+            <span class="mode-text">AM</span>
+          </div>
+          <div class="mode-item active" id="mode-fm">
+            <span class="radio-ring"><span class="radio-dot"></span></span>
+            <span class="mode-text">FM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VELOCITÀ -->
+      <div class="panel-box speed-panel">
+        <div class="panel-title">VELOCITÀ</div>
+        <div class="slider-box">
+          <input type="range" id="speed-slider" min="30" max="300" value="100" />
+        </div>
+        <div class="speed-caption" id="speed-caption">MEDIA (100 ms)</div>
+      </div>
+
+      <!-- BOTTONE START SCAN NEON VERDE -->
+      <button class="scan-button" id="btn-scan">
+        <span class="scan-icon" id="scan-icon">▶</span>
+        <span class="scan-label" id="scan-label">START SCAN</span>
+      </button>
+
+      <!-- STATO -->
+      <div class="panel-box status-panel">
+        <div class="panel-title">STATO</div>
+        <div class="status-rows">
+          <div class="status-row">
+            <span class="status-prop">Scanner</span>
+            <span class="status-val-dot"><span class="dot-green" id="st-scanner-dot"></span><span id="st-scanner-val">Attivo</span></span>
+          </div>
+          <div class="status-row">
+            <span class="status-prop">Ricezione</span>
+            <span class="status-val-dot"><span class="dot-green"></span>Buona</span>
+          </div>
+          <div class="status-row">
+            <span class="status-prop">SNR</span>
+            <span class="status-val" id="st-snr">28 dB</span>
+          </div>
+          <div class="status-row">
+            <span class="status-prop">Modalità</span>
+            <span class="status-val" id="st-band">FM</span>
+          </div>
+          <div class="status-row">
+            <span class="status-prop">Filtro</span>
+            <span class="status-val">Standard</span>
+          </div>
+          <div class="status-row">
+            <span class="status-prop">Aggiornamento</span>
+            <span class="status-val" id="st-refresh">100 ms</span>
+          </div>
+          <div class="status-row anomaly-row" id="st-anomaly-row">
+            <span class="status-prop">Anomalia EVP</span>
+            <span class="status-val text-red" id="st-anomaly-val">NESSUNA</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLONNA CENTRALE -->
+    <section class="col-center">
+      <!-- FREQUENZA ATTUALE -->
+      <div class="panel-box freq-panel">
+        <div class="freq-header">
+          <span class="panel-title">FREQUENZA ATTUALE</span>
+          <div class="rds-group">
+            <div class="rds-item"><span class="rds-name">STEREO</span> <span class="rds-dot active"></span></div>
+            <div class="rds-item"><span class="rds-name">RDS</span> <span class="rds-dot" id="rds-indicator"></span></div>
+            <div class="rds-item"><span class="rds-name">AF</span> <span class="rds-dot"></span></div>
+            <div class="rds-item"><span class="rds-name">TA</span> <span class="rds-dot"></span></div>
+          </div>
+        </div>
+        <div class="freq-center-display">
+          <span class="freq-giant-number" id="freq-number">104.30</span>
+          <span class="freq-giant-unit" id="freq-unit">MHz</span>
+        </div>
+      </div>
+
+      <!-- SPETTRO AUDIO & SPETTROGRAMMA TERMOGRAFICO SCIENTIFICO -->
+      <div class="panel-box spectrum-panel">
+        <div class="spectrum-header">
+          <div class="spectrum-title-tabs">
+            <span class="panel-title active-spec" id="btn-view-spectrum">SPETTRO AUDIO dB</span>
+            <span class="spec-divider">|</span>
+            <span class="panel-title" id="btn-view-waterfall">SPETTROGRAMMA 2D</span>
+          </div>
+          <div class="spectrum-badge-anomaly" id="spectrum-anomaly-badge">⚡ PICCO ANOMALIA EVP (ROSSO)</div>
+        </div>
+        <div class="spectrum-body">
+          <canvas id="spectrum-canvas"></canvas>
+          <canvas id="waterfall-integrated-canvas" style="display:none;"></canvas>
+        </div>
+        <div class="spectrum-x-axis" id="spectrum-axis">
+          <span>103.5</span>
+          <span>104.0</span>
+          <span class="center-tick">104.5</span>
+          <span>105.0</span>
+          <span>105.5</span>
+          <span class="unit-tick">MHz</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLONNA DESTRA -->
+    <section class="col-right">
+      <!-- FREQUENZE RECENTI -->
+      <div class="panel-box recent-panel">
+        <div class="panel-title">FREQUENZE RECENTI</div>
+        <div class="recent-list" id="recent-list">
+          <!-- Popolato dinamicamente -->
+        </div>
+      </div>
+
+      <!-- SINTONIA KNOB MOCKUP -->
+      <div class="panel-box knob-panel">
+        <div class="panel-title">SINTONIA</div>
+        <div class="knob-row">
+          <button class="knob-chevron" id="knob-left">‹</button>
+          
+          <div class="knob-wrapper" id="knob-rotary">
+            <div class="knob-outer-ring">
+              <div class="knob-core">
+                <div class="knob-needle" id="knob-needle"></div>
+              </div>
+            </div>
+          </div>
+
+          <button class="knob-chevron" id="knob-right">›</button>
+        </div>
+        <div class="knob-readout" id="knob-readout">104.30 MHz</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════════════ TAB ARCHIVIO ══════════════════════ -->
+  <section class="tab-content secondary-tab" id="tab-archivio">
+    <div class="secondary-card">
+      <div class="sec-header">
+        <div class="sec-title-box">
+          <h2>ARCHIVIO FREQUENZE & INTERCETTAZIONI FONEMI</h2>
+          <span class="sec-subtitle">Registro scientifico delle anomalie audio e parole catturate</span>
+        </div>
+        <div class="sec-actions">
+          <button class="btn-sec-action" id="btn-export-pdf">ESPORTA PDF</button>
+          <button class="btn-sec-action" id="btn-export-csv">CSV</button>
+          <button class="btn-sec-action danger" id="btn-clear-archive">SVUOTA</button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table class="data-table" id="archive-table">
+          <thead>
+            <tr>
+              <th>DATA / ORA</th>
+              <th>FREQUENZA</th>
+              <th>BANDA</th>
+              <th>PAROLA / FONEMA</th>
+              <th>LIVELLO SEGNALE</th>
+              <th>TIPO RILEVAMENTO</th>
+              <th>AZIONI</th>
+            </tr>
+          </thead>
+          <tbody id="archive-tbody">
+            <!-- Popolato via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ TAB ANALISI ══════════════════════ -->
+  <section class="tab-content secondary-tab" id="tab-analisi">
+    <div class="secondary-card">
+      <div class="sec-header">
+        <div class="sec-title-box">
+          <h2>ANALISI SPETTROGRAMMA & WATERFALL</h2>
+          <span class="sec-subtitle">Spettrogramma scientifico 2D continuo per rilevamento fonemi EVP</span>
+        </div>
+      </div>
+      <div class="analysis-grid">
+        <div class="waterfall-box">
+          <div class="box-title">SPETTROGRAMMA TERMOGRAFICO RF</div>
+          <canvas id="waterfall-canvas"></canvas>
+        </div>
+        <div class="metrics-column">
+          <div class="metric-card">
+            <span class="m-label">FREQUENZA CENTRO SPETTRO</span>
+            <span class="m-val" id="an-freq-val">104.30 MHz</span>
+          </div>
+          <div class="metric-card">
+            <span class="m-label">CAMPIONAMENTO FONEMI</span>
+            <span class="m-val">44.1 kHz / 16-bit PCM</span>
+          </div>
+          <div class="metric-card">
+            <span class="m-label">PICCHI ANOMALIA RILEVATI</span>
+            <span class="m-val text-red" id="an-peaks-count">3</span>
+          </div>
+          <div class="metric-card">
+            <span class="m-label">LIVELLO RUMORE DI FONDO</span>
+            <span class="m-val">-82 dBm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ TAB IMPOSTAZIONI (CON RICERCA AGGIORNAMENTI) ══════════════════════ -->
+  <section class="tab-content secondary-tab" id="tab-impostazioni">
+    <div class="secondary-card">
+      <div class="sec-header">
+        <div class="sec-title-box">
+          <h2>IMPOSTAZIONI SISTEMA & RICERCA AGGIORNAMENTI</h2>
+          <span class="sec-subtitle">Configurazione Spirit Box, sintesi vocale e aggiornamenti firmware</span>
+        </div>
+        <button class="btn-sec-action" id="btn-save-settings">SALVA</button>
+      </div>
+
+      <div class="settings-grid">
+        <!-- Box Aggiornamenti -->
+        <div class="settings-col">
+          <div class="set-box highlight-box">
+            <div class="set-box-title">⚡ RICERCA AGGIORNAMENTI (v26 Beta 4)</div>
+            
+            <div class="update-action-row" style="margin-top: 10px;">
+              <button class="btn-update-check" id="btn-check-updates">VERIFICA AGGIORNAMENTI ORA</button>
+            </div>
+
+            <div class="update-progress-bar" id="update-progress-bar" style="display:none;">
+              <div class="up-fill" id="update-fill"></div>
+            </div>
+
+            <div style="margin-top: 10px; background: #03080f; padding: 8px 10px; border-radius: 4px; border: 1px solid #14283c;">
+              <span class="update-status-label" id="update-status-text">Versione installata: v26 Beta 4 (Build 2026.11.01)</span>
+            </div>
+          </div>
+
+          <div class="set-box">
+            <div class="set-box-title">MOTORE FONEMI & SINTESI VOCALE</div>
+            
+            <!-- Regolazione Volume Vocale Interno -->
+            <div class="vol-control-box">
+              <div class="vol-label-row">
+                <label for="tts-vol-slider">VOLUME VOCE RILEVAMENTO:</label>
+                <span class="vol-val-disp" id="tts-vol-label">100%</span>
+              </div>
+              <div class="slider-box">
+                <input type="range" id="tts-vol-slider" min="0.1" max="1.0" step="0.05" value="1.0" />
+              </div>
+              <button class="btn-test-voice" id="btn-test-tts">🔊 TESTA VOLUME VOCE</button>
+            </div>
+
+            <div class="set-field" style="margin-top: 10px;">
+              <label><input type="checkbox" id="chk-tts" checked /> Pronuncia vocale (TTS) quando intercetta una parola</label>
+            </div>
+            <div class="set-field">
+              <label><input type="checkbox" id="chk-sound" checked /> Effetti acustici Chime di allerta anomalia</label>
+            </div>
+            <div class="set-field">
+              <label><input type="checkbox" id="chk-static" checked /> Simulazione rumore bianco radio tra le frequenze</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Box Dizionario e Sensibilità -->
+        <div class="settings-col">
+          <div class="set-box">
+            <div class="set-box-title">DIZIONARIO FONEMI & PAROLE CHIAVE</div>
+            <p class="set-desc">Parole e fonemi cercati dal modulo di intercettazione (separati da virgola):</p>
+            <textarea class="set-textarea" id="txt-keywords" rows="5">AIUTO, SPIRITO, QUI, SENTI, NOME, MORTE, LUCE, TEMPO, SÌ, NO, ASCOLTA, VICINO, FREDDO, PORTA, PRESENZA, CERCA, ANIMA, DIMMI, BUIO, OMBRA, PARLA, RICORDO, ADDIO, LIBERO, RESTO, PAURA, FUOCO, ACQUA, NOTTE, CASA, ATTENTO, GUIDA, SONO QUI, CHI SEI, NON ANDARE, TI SENTO, AIUTAMI, VOGLIO PARLARE, DIETRO DI TE, NON POSSO, DIMMI IL NOME, È FREDDO, C'È QUALCUNO, GUARDAMI, NON SIAMO SOLI, ASCOLTAMI BENE, VAI VIA, RESTO CON TE, LUCE BIANCA, LIBERAMI, PRIGIONIERO, TI VEDO</textarea>
+          </div>
+
+          <div class="set-box">
+            <div class="set-box-title">SENSIBILITÀ DI INTERCETTAZIONE</div>
+            <div class="slider-box">
+              <input type="range" id="sens-slider" min="1" max="10" value="6" />
+            </div>
+            <div class="speed-caption" id="sens-caption">Livello 6 / 10 (Ottimale)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ BOTTOM BAR ══════════════════════ -->
+  <footer class="app-footer">
+    <div class="footer-col col-bw">
+      <div class="footer-title">LARGHEZZA DI BANDA</div>
+      <div class="footer-val-box">
+        <svg class="sine-icon" viewBox="0 0 36 16" width="30" height="14">
+          <path d="M 1 8 Q 5 15 10 8 T 19 8 T 28 8 T 35 8" fill="none" stroke="#00efff" stroke-width="2"/>
+        </svg>
+        <span class="footer-text">200 kHz</span>
+      </div>
+    </div>
+
+    <div class="footer-col col-demod">
+      <div class="footer-title">DEMODULAZIONE</div>
+      <div class="footer-val-box">
+        <svg class="sine-icon" viewBox="0 0 36 16" width="30" height="14">
+          <path d="M 1 8 C 8 0 12 0 18 8 C 24 16 28 16 35 8" fill="none" stroke="#3b82f6" stroke-width="2"/>
+        </svg>
+        <span class="footer-text" id="footer-demod">WBFM</span>
+      </div>
+    </div>
+
+    <div class="footer-col col-signal">
+      <div class="footer-title">LIVELLO SEGNALE</div>
+      <div class="vu-meter" id="vu-signal">
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div>
+      </div>
+    </div>
+
+    <div class="footer-col col-audio">
+      <div class="footer-title">LIVELLO AUDIO</div>
+      <div class="vu-meter vu-audio" id="vu-audio">
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div><div class="vu-bar"></div>
+        <div class="vu-bar"></div><div class="vu-bar"></div>
+      </div>
+    </div>
+
+    <div class="footer-col col-process">
+      <div class="footer-title">PROCESSI ATTIVI</div>
+      <div class="process-box">
+        <svg class="gear-spinner" viewBox="0 0 24 24" width="16" height="16">
+          <path fill="#3b82f6" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+        </svg>
+        <span class="process-caption" id="process-caption">In attesa...</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ══════════════════════ POPUP MOCKUP IDENTICO CON SCRITTURA PAROLA ══════════════════════ -->
+  <div class="popup-overlay" id="popup-overlay">
+    <div class="popup-window">
+      <button class="popup-x" id="popup-btn-x">✕</button>
+      
+      <div class="popup-top">
+        <div class="popup-i-circle">
+          <span>i</span>
+        </div>
+        <div class="popup-texts">
+          <div class="popup-line-1">Parola rilevata a <span id="popup-detected-freq">104.30 MHz</span>.</div>
+          <div class="popup-word-row">FONEMA INTERCETTATO: <strong id="popup-word-value" class="text-glow-word">SPIRITO</strong></div>
+          <div class="popup-line-2">Salvare la frequenza e archiviare?</div>
+        </div>
+      </div>
+
+      <div class="popup-btn-row">
+        <button class="popup-btn-si" id="popup-btn-si">SÌ</button>
+        <button class="popup-btn-no" id="popup-btn-no">NO</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast-msg"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

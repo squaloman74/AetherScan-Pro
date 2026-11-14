@@ -1,0 +1,73 @@
+name: Build AetherScan Pro iOS (IPA) - Beta 1 (01/11/2026)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      discussions: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build iOS Framework / Runner
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package Payload and Create unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r AetherScan-Pro-v26-beta1-01112026-unsigned.ipa Payload
+          mkdir -p release-ios
+          mv AetherScan-Pro-v26-beta1-01112026-unsigned.ipa release-ios/
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AetherScan-Pro-iOS-IPA
+          path: release-ios/*.ipa
+
+      - name: Create GitHub Release with IPA
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v26-beta1
+          name: "AetherScan Pro v26 Beta 1 - iOS (01/11/2026)"
+          body: |
+            ## AetherScan Pro v26 Beta 1 � iOS (IPA Unsigned)
+            **Data build:** 01/11/2026
+
+            ### Fix e novit� inclusi:
+            - ? Licenza persiste al riavvio app (UserDefaults.standard + retry 5x)
+            - ? Audio TTS funzionante (AVAudioSession .playback, bypassa modalit� silenziosa)
+            - ? Sensore Prossimit�: allerta quando qualcosa si avvicina al dispositivo
+            - ? Sensore EMF/Magnetometro: rilevazione anomalie campo magnetico
+            - ? Voce maschile/femminile selezionabile nelle impostazioni
+            - ? Tab Analisi: spettrogramma + heatmap termografica animata
+            - ? Parola EVP inline (no popup) + auto-salvataggio archivio
+            - ? Frequenza anomalie ridotta (pi� realistica, ~70s tra rilevazioni)
+            - ? Schermo sempre acceso durante scansione (isIdleTimerDisabled)
+
+            ### Installazione
+            Scarica l\'IPA e installa via Sideloadly o SideStore/AltStore.
+          files: release-ios/*.ipa
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

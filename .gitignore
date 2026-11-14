@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+**/.dart_tool/
+**/.cache_data/
+**/.pub-cache/
+**/.pub/
+**/.gradle/
+
+# Builds & Outputs
+**/build/
+android/app/build/
+android/app/release/
+ios-project/build/
+release-android/
+
+# Competitor research files
+GHOST TUBE APK/
+
+# Local & IDE configuration
+.git_backup/
+*.git_backup/
+.DS_Store
+Thumbs.db
+**/.idea/
+**/.vscode/
+*.log
+*.tmp
+local.properties
+.metadata
+release-apk/
+*.apk
