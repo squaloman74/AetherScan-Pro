@@ -130,7 +130,7 @@ void main() {
     test('Esportazione JSON e compatibilità di schema', () {
       final jsonStr = logger.exportJson();
       expect(jsonStr.contains('AetherScan-Pro'), isTrue);
-      expect(jsonStr.contains('Scientific Forensic Logger v2.0'), isTrue);
+      expect(jsonStr.contains('Scientific Forensic Logger v27-beta2'), isTrue);
       expect(jsonStr.contains('ASPRO-TEST-001'), isTrue);
     });
   });

@@ -21,7 +21,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro (Scientific Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -410,14 +410,30 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           children: [
             const Icon(Icons.show_chart, color: IndustrialPalette.phosphorCyan, size: 20),
             const SizedBox(width: 8),
-            const Text(
-              'AETHERSCAN-PRO',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
-                fontFamily: 'monospace',
-              ),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'AETHERSCAN-PRO',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                Text(
+                  'v27-beta2 • METROLOGY',
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    color: IndustrialPalette.phosphorCyan,
+                    letterSpacing: 1.0,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
             const Spacer(),
             Container(
