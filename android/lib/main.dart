@@ -721,7 +721,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               audioPeakHz: _audioPeakHz,
               onBandChanged: (b) => setState(() => _spectralSweepEngine.setBand(b)),
               onIntervalChanged: (ms) => setState(() => _spectralSweepEngine.setSweepInterval(ms)),
-              onToggleDirection: () => setState(() => _spectralSweepEngine.toggleDirection()),
+              onDirectionChanged: (dir) => setState(() => _spectralSweepEngine.setDirection(dir)),
               onTogglePause: () => setState(() => _spectralSweepEngine.setPaused(_spectralSweepEngine.direction != SweepDirection.paused)),
             ),
 

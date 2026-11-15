@@ -83,6 +83,10 @@ class SpectralSweepEngine {
     sweepIntervalMs = intervalMs.clamp(30, 1000);
   }
 
+  void setDirection(SweepDirection newDirection) {
+    direction = newDirection;
+  }
+
   void toggleDirection() {
     if (direction == SweepDirection.forward) {
       direction = SweepDirection.reverse;

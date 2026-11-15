@@ -16,7 +16,7 @@ class SpectralSweepView extends StatelessWidget {
   final double audioPeakHz;
   final ValueChanged<SweepBand> onBandChanged;
   final ValueChanged<int> onIntervalChanged;
-  final VoidCallback onToggleDirection;
+  final ValueChanged<SweepDirection> onDirectionChanged;
   final VoidCallback onTogglePause;
 
   const SpectralSweepView({
@@ -33,7 +33,7 @@ class SpectralSweepView extends StatelessWidget {
     required this.audioPeakHz,
     required this.onBandChanged,
     required this.onIntervalChanged,
-    required this.onToggleDirection,
+    required this.onDirectionChanged,
     required this.onTogglePause,
   });
 
@@ -363,41 +363,81 @@ class SpectralSweepView extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
 
-                // Pulsanti Play / Pause e Inversione Direzione
+                // Controlli Play / Pause e Direzione (AVANTI e INDIETRO separati e ben visibili)
                 Row(
                   children: [
+                    // Tasto Play / Pausa
                     Expanded(
+                      flex: 4,
                       child: ElevatedButton.icon(
                         icon: Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 16),
                         label: Text(
-                          isPaused ? 'AVVIA SWEEP' : 'PAUSA SWEEP',
-                          style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                          isPaused ? 'AVVIA' : 'PAUSA',
+                          style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isPaused ? IndustrialPalette.phosphorGreen : IndustrialPalette.surfaceLight,
                           foregroundColor: isPaused ? Colors.black : IndustrialPalette.textWhite,
                           side: const BorderSide(color: IndustrialPalette.border),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onPressed: onTogglePause,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
+                    // Tasto Scansione Indietro (REV)
                     Expanded(
+                      flex: 3,
                       child: ElevatedButton.icon(
-                        icon: Icon(
-                          currentDirection == SweepDirection.reverse ? Icons.fast_rewind : Icons.fast_forward,
-                          size: 16,
-                        ),
-                        label: Text(
-                          currentDirection == SweepDirection.reverse ? 'DIR: REV (◀)' : 'DIR: FWD (▶)',
-                          style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                        icon: const Icon(Icons.arrow_back, size: 13),
+                        label: const Text(
+                          'REV ◀',
+                          style: TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: IndustrialPalette.surfaceLight,
-                          foregroundColor: IndustrialPalette.phosphorCyan,
-                          side: const BorderSide(color: IndustrialPalette.border),
+                          backgroundColor: currentDirection == SweepDirection.reverse
+                              ? IndustrialPalette.alertAmber.withValues(alpha: 0.25)
+                              : IndustrialPalette.surfaceLight,
+                          foregroundColor: currentDirection == SweepDirection.reverse
+                              ? IndustrialPalette.alertAmber
+                              : IndustrialPalette.textMuted,
+                          side: BorderSide(
+                            color: currentDirection == SweepDirection.reverse
+                                ? IndustrialPalette.alertAmber
+                                : IndustrialPalette.border,
+                            width: currentDirection == SweepDirection.reverse ? 1.5 : 1.0,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        onPressed: onToggleDirection,
+                        onPressed: () => onDirectionChanged(SweepDirection.reverse),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // Tasto Scansione Avanti (FWD)
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.arrow_forward, size: 13),
+                        label: const Text(
+                          'FWD ▶',
+                          style: TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: currentDirection == SweepDirection.forward
+                              ? IndustrialPalette.phosphorCyan.withValues(alpha: 0.25)
+                              : IndustrialPalette.surfaceLight,
+                          foregroundColor: currentDirection == SweepDirection.forward
+                              ? IndustrialPalette.phosphorCyan
+                              : IndustrialPalette.textMuted,
+                          side: BorderSide(
+                            color: currentDirection == SweepDirection.forward
+                                ? IndustrialPalette.phosphorCyan
+                                : IndustrialPalette.border,
+                            width: currentDirection == SweepDirection.forward ? 1.5 : 1.0,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onPressed: () => onDirectionChanged(SweepDirection.forward),
                       ),
                     ),
                   ],
