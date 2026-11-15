@@ -201,9 +201,9 @@ class ForensicSessionLogger {
   List<ForensicLogEntry> get entries => List.unmodifiable(_entries);
   int get totalEntries => _entries.length;
   int get validAnomaliesCount =>
-      _entries.where((e) => e.classification == TriggerClassification.validAnomaly).length;
+      _entries.where((e) => e.classification == TriggerClassification.environmentalAnomaly || e.classification == TriggerClassification.dualTriggerInteraction).length;
   int get artifactCount =>
-      _entries.where((e) => e.classification == TriggerClassification.mechanicalArtifact).length;
+      _entries.where((e) => e.classification == TriggerClassification.mechanicalTouch).length;
 
   /// Registra un nuovo evento di trigger deterministico nel ledger
   ForensicLogEntry logTrigger(

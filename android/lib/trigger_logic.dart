@@ -1,19 +1,26 @@
 import 'dart:math';
 import 'baseline_engine.dart';
 
-/// Classificazione deterministica dell'evento analizzato
+/// Classificazione deterministica e rigorosa dell'evento analizzato
 enum TriggerClassification {
   /// Segnale nei limiti del rumore statistico ordinario (|Z| < zThreshold)
   none,
 
-  /// Anomalia ambientale convalidata (|Z| >= zThreshold, persistenza >= minDurationMs, no bump)
-  validAnomaly,
+  /// Anomalia metrologica ambientale pura (|Z| >= 3.5σ, persistenza >= minDurationMs, nessun tocco)
+  /// Registrata nel log forense CSV. NESSUN SUONO DI INTERAZIONE.
+  environmentalAnomaly,
 
-  /// Artefatto meccanico: deviazione dovuta a scuotimento o spostamento fisico dello strumento
-  mechanicalArtifact,
+  /// Sollecitazione meccanica/urto sul telaio (|A_dyn| >= 3.2 m/s²) senza anomalia EMF contemporanea
+  /// Segnalazione visiva di urto meccanico. NESSUN SUONO DI ALLARME.
+  mechanicalTouch,
 
-  /// Transitorio impulsivo non persistente (spike isolato < minDurationMs)
+  /// Transitorio impulsivo non persistente (spike isolato < minDurationMs) scartato
   transientSpike,
+
+  /// COINCIDENZA DUAL-TRIGGER: Contatto/pressione fisica (|A_dyn| >= 3.2 m/s²)
+  /// + Anomalia EMF (|Z| >= 3.5σ) convalidati contemporaneamente.
+  /// QUESTA È L'UNICA CONDIZIONE CHE ATTIVA IL SEGNALE ACUSTICO DI ALLARME.
+  dualTriggerInteraction,
 }
 
 /// Dati telemetrici istantanei forniti dai sensori hardware al trigger engine
@@ -42,16 +49,13 @@ class TriggerResult {
   final double zScoreEmf;
   final double snrDbEmf;
 
-  // Metriche Accelerometro / Bump
+  // Metriche Accelerometro / Contatto
   final double rawDynamicAccel;
   final double zScoreAccel;
-  final bool isBumpDetected;
+  final bool isPhysicalTouch;
 
   // Persistenza
   final int persistenceMs;
-
-  // Mappatura semantica deterministica (opzionale, basata su hash crittografico/CRC)
-  final int? deterministicLemmaIndex;
 
   const TriggerResult({
     required this.timestamp,
@@ -62,13 +66,27 @@ class TriggerResult {
     required this.snrDbEmf,
     required this.rawDynamicAccel,
     required this.zScoreAccel,
-    required this.isBumpDetected,
+    required this.isPhysicalTouch,
     required this.persistenceMs,
-    this.deterministicLemmaIndex,
   });
 
-  bool get isAnomaly => classification == TriggerClassification.validAnomaly;
-  bool get isArtifact => classification == TriggerClassification.mechanicalArtifact;
+  /// True se è scattata l'interazione dual-trigger congiunta (Tocco + Anomalia Metrologica)
+  bool get isDualTrigger => classification == TriggerClassification.dualTriggerInteraction;
+
+  /// True se è presente un'anomalia ambientale pura (senza contatto fisico)
+  bool get isEnvironmentalAnomaly => classification == TriggerClassification.environmentalAnomaly;
+
+  /// True se è solo un contatto/urto meccanico senza variazione EMF
+  bool get isMechanicalTouch => classification == TriggerClassification.mechanicalTouch;
+
+  /// Condizione stringente per l'emissione del suono di allarme:
+  /// SOLO E UNICAMENTE la coincidenza fisica dual-trigger!
+  bool get shouldTriggerAlarmSound => isDualTrigger;
+
+  /// Compatibilità con lo storico
+  bool get isAnomaly => isDualTrigger || isEnvironmentalAnomaly;
+  bool get isArtifact => isMechanicalTouch;
+  bool get isBumpDetected => isPhysicalTouch;
 
   Map<String, dynamic> toMap() {
     return {
@@ -83,21 +101,20 @@ class TriggerResult {
       'vibration': {
         'raw_dynamic_ms2': rawDynamicAccel,
         'z_score': zScoreAccel,
-        'is_bump': isBumpDetected,
+        'is_touch': isPhysicalTouch,
       },
       'persistence_ms': persistenceMs,
-      'lemma_index': deterministicLemmaIndex,
+      'alarm_triggered': shouldTriggerAlarmSound,
     };
   }
 }
 
-/// Motore deterministico basato su soglie statistiche e filtro anti-bump
-/// Totalmente esente da generatori casuali (PRNG).
+/// Motore deterministico basato su soglie statistiche e doppia validazione simultanea
+/// Totalmente esente da generatori casuali (PRNG) e da dizionari fittizi.
 class DeterministicTriggerEngine {
-  final double zThreshold; // Soglia Z-Score (standard: 3.5 sigma)
-  final double bumpZThreshold; // Soglia Z-Score vibrazione per rilevare urto/movimento (standard: 2.5 sigma)
-  final int minPersistenceMs; // Durata minima continua dell'anomalia (standard: 150 ms)
-  final int lemmaPoolSize; // Ampiezza del dizionario per mapping deterministico (default: 98)
+  final double zThreshold; // Soglia Z-Score (standard severo: 3.5 sigma, confidenza > 99.95%)
+  final double touchAccelThreshold; // Soglia accelerazione dinamica per contatto/pressione (standard: 3.2 m/s²)
+  final int minPersistenceMs; // Durata minima continua dell'anomalia EMF (standard: 150 ms)
 
   BaselineProfile? _baseline;
   DateTime? _spikeStartTime;
@@ -105,9 +122,8 @@ class DeterministicTriggerEngine {
 
   DeterministicTriggerEngine({
     this.zThreshold = 3.5,
-    this.bumpZThreshold = 2.5,
+    this.touchAccelThreshold = 3.2,
     this.minPersistenceMs = 150,
-    this.lemmaPoolSize = 98,
     BaselineProfile? baseline,
   }) {
     _baseline = baseline;
@@ -125,7 +141,7 @@ class DeterministicTriggerEngine {
     _consecutiveAnomalySamples = 0;
   }
 
-  /// Valutazione deterministica in tempo reale del campione sensoriale
+  /// Valutazione deterministica in tempo reale con Logica di Doppia Validazione Simultanea
   TriggerResult evaluate(SensorReading reading) {
     final base = _baseline;
     if (base == null || !base.isValid) {
@@ -138,12 +154,12 @@ class DeterministicTriggerEngine {
         snrDbEmf: 0.0,
         rawDynamicAccel: reading.dynamicAcceleration,
         zScoreAccel: 0.0,
-        isBumpDetected: false,
+        isPhysicalTouch: false,
         persistenceMs: 0,
       );
     }
 
-    // 1. Calcolo Z-Score e Delta per EMF
+    // 1. Calcolo Z-Score e Delta per EMF (Condizione Metrologica)
     final double deltaEmf = reading.emfMagnitude - base.emfMean;
     final double emfSd = max(base.emfStdDev, 0.01);
     final double zScoreEmf = deltaEmf / emfSd;
@@ -153,51 +169,53 @@ class DeterministicTriggerEngine {
         ? 20.0 * (log(deltaEmf.abs() / emfSd) / ln10)
         : 0.0;
 
-    // 2. Controllo Filtro Anti-Bump su Accelerometro
+    // Condizione 2 (Anomalia Metrologica Severa: |Z| >= 3.5σ)
+    final bool isEmfAnomaly = zScoreEmf.abs() >= zThreshold;
+
+    // 2. Controllo Contatto/Pressione Meccanica sul Telaio (Condizione 1: |A_dyn| >= 3.2 m/s²)
     final double vibSd = max(base.vibStdDev, 0.01);
     final double deltaVib = reading.dynamicAcceleration - base.vibMean;
     final double zScoreAccel = deltaVib / vibSd;
-    final bool isBump = zScoreAccel.abs() >= bumpZThreshold;
+    final bool isTouchDetected = reading.dynamicAcceleration >= touchAccelThreshold;
 
-    // 3. Valutazione Significatività Statistica (|Z| >= 3.5)
-    final bool isStatisticallySignificant = zScoreEmf.abs() >= zThreshold;
-
-    if (!isStatisticallySignificant) {
+    // CASO A: Segnale ordinario (né anomalia metrologica né tocco)
+    if (!isEmfAnomaly && !isTouchDetected) {
       _spikeStartTime = null;
       _consecutiveAnomalySamples = 0;
       return TriggerResult(
         timestamp: reading.timestamp,
-        classification: isBump ? TriggerClassification.mechanicalArtifact : TriggerClassification.none,
+        classification: TriggerClassification.none,
         rawEmf: reading.emfMagnitude,
         deltaEmf: deltaEmf,
         zScoreEmf: zScoreEmf,
         snrDbEmf: snrDb,
         rawDynamicAccel: reading.dynamicAcceleration,
         zScoreAccel: zScoreAccel,
-        isBumpDetected: isBump,
+        isPhysicalTouch: false,
         persistenceMs: 0,
       );
     }
 
-    // Se c'è un bump dell'accelerometro contemporaneo all'anomalia, si classifica come artefatto
-    if (isBump) {
+    // CASO B: Solo tocco/sollecitazione meccanica SENZA anomalia EMF contemporanea
+    // -> Segnala "Urto Meccanico" sul display, NESSUN SUONO DI ALLARME emesso.
+    if (!isEmfAnomaly && isTouchDetected) {
       _spikeStartTime = null;
       _consecutiveAnomalySamples = 0;
       return TriggerResult(
         timestamp: reading.timestamp,
-        classification: TriggerClassification.mechanicalArtifact,
+        classification: TriggerClassification.mechanicalTouch,
         rawEmf: reading.emfMagnitude,
         deltaEmf: deltaEmf,
         zScoreEmf: zScoreEmf,
         snrDbEmf: snrDb,
         rawDynamicAccel: reading.dynamicAcceleration,
         zScoreAccel: zScoreAccel,
-        isBumpDetected: true,
+        isPhysicalTouch: true,
         persistenceMs: 0,
       );
     }
 
-    // 4. Calcolo Persistenza Temporale
+    // Calcolo persistenza temporale per verificare che l'anomalia EMF non sia uno spike transitorio
     _spikeStartTime ??= reading.timestamp;
     _consecutiveAnomalySamples++;
     final int persistenceMs = reading.timestamp.difference(_spikeStartTime!).inMilliseconds;
@@ -212,62 +230,42 @@ class DeterministicTriggerEngine {
         snrDbEmf: snrDb,
         rawDynamicAccel: reading.dynamicAcceleration,
         zScoreAccel: zScoreAccel,
-        isBumpDetected: false,
+        isPhysicalTouch: isTouchDetected,
         persistenceMs: persistenceMs,
       );
     }
 
-    // 5. Generazione Deterministica dell'indice lessicale (Anti-RNG)
-    final int lemmaIdx = _computeDeterministicLemma(
-      deltaEmf: deltaEmf,
-      zScore: zScoreEmf,
-      accel: reading.dynamicAcceleration,
-      pressure: reading.pressureHpa ?? 1013.25,
-      persistenceMs: persistenceMs,
-    );
+    // CASO C: TOCCO FISICO + ANOMALIA METROLOGICA EMF SIMULTANEI
+    // -> Verificate contemporaneamente entrambe le condizioni fisiche!
+    // -> QUESTA È L'UNICA CONDIZIONE CHE SCATENA IL SEGNALE DI ALLARME ACUSTICO PERSONALIZZATO!
+    if (isEmfAnomaly && isTouchDetected) {
+      return TriggerResult(
+        timestamp: reading.timestamp,
+        classification: TriggerClassification.dualTriggerInteraction,
+        rawEmf: reading.emfMagnitude,
+        deltaEmf: deltaEmf,
+        zScoreEmf: zScoreEmf,
+        snrDbEmf: snrDb,
+        rawDynamicAccel: reading.dynamicAcceleration,
+        zScoreAccel: zScoreAccel,
+        isPhysicalTouch: true,
+        persistenceMs: persistenceMs,
+      );
+    }
 
+    // CASO D: Solo anomalia EMF SENZA tocco fisico (|Z| >= 3.5σ ma telefono immobile)
+    // -> Registra nel log forense CSV come misurazione ambientale pura, NESSUN SUONO DI ALLARME CONTATTO.
     return TriggerResult(
       timestamp: reading.timestamp,
-      classification: TriggerClassification.validAnomaly,
+      classification: TriggerClassification.environmentalAnomaly,
       rawEmf: reading.emfMagnitude,
       deltaEmf: deltaEmf,
       zScoreEmf: zScoreEmf,
       snrDbEmf: snrDb,
       rawDynamicAccel: reading.dynamicAcceleration,
       zScoreAccel: zScoreAccel,
-      isBumpDetected: false,
+      isPhysicalTouch: false,
       persistenceMs: persistenceMs,
-      deterministicLemmaIndex: lemmaIdx,
     );
-  }
-
-  /// Algoritmo di Hash Deterministico 32-bit (FNV-1a) per mappatura dei lemmi
-  /// senza ricorrere a generatori casuali. Lo stesso vettore fisico genera sempre lo stesso indice.
-  int _computeDeterministicLemma({
-    required double deltaEmf,
-    required double zScore,
-    required double accel,
-    required double pressure,
-    required int persistenceMs,
-  }) {
-    if (lemmaPoolSize <= 0) return 0;
-
-    // Codifica dei byte fisici
-    final int b1 = (deltaEmf.abs() * 100).round() & 0xFFFFFFFF;
-    final int b2 = (zScore.abs() * 1000).round() & 0xFFFFFFFF;
-    final int b3 = (accel * 1000).round() & 0xFFFFFFFF;
-    final int b4 = (pressure * 100).round() & 0xFFFFFFFF;
-    final int b5 = persistenceMs & 0xFFFFFFFF;
-
-    // FNV-1a 32-bit hash
-    int hash = 0x811C9DC5;
-    for (final v in [b1, b2, b3, b4, b5]) {
-      hash ^= (v & 0xFF);
-      hash = (hash * 0x01000193) & 0xFFFFFFFF;
-      hash ^= ((v >> 8) & 0xFF);
-      hash = (hash * 0x01000193) & 0xFFFFFFFF;
-    }
-
-    return hash.abs() % lemmaPoolSize;
   }
 }

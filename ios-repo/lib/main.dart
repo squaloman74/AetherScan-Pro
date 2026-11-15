@@ -76,13 +76,6 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   String _deviceHwid = 'INITIALIZING...';
   bool _isAuthorized = false;
 
-  final List<String> _lexicon = [
-    'PRESENZA', 'VARIAZIONE_CAMPO', 'ANOMALIA_EVP', 'STRUTTURA',
-    'FLUSSO_MAGNETICO', 'FLUTTUAZIONE', 'FONEMA_ISOLATO', 'SPOSTAMENTO',
-    'ALTERAZIONE_TEMPERATURA', 'GRADIENTE', 'ISOLATO', 'INTERFERENZA',
-    'EMISSIONE_RF', 'DECIFRAZIONE_OK', 'ATTESA_CONFERMA', 'STATO_STABILE'
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -123,9 +116,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
     _triggerEngine = DeterministicTriggerEngine(
       zThreshold: 3.5,
-      bumpZThreshold: 2.5,
+      touchAccelThreshold: 3.2,
       minPersistenceMs: 150,
-      lemmaPoolSize: _lexicon.length,
     );
 
     _dspChain = AnalyticalDSPChain(sampleRate: 48000.0);
@@ -222,24 +214,41 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
 
     final res = _triggerEngine.evaluate(reading);
-    if (res.isAnomaly) {
-      final lemma = res.deterministicLemmaIndex != null
-          ? _lexicon[res.deterministicLemmaIndex!]
-          : null;
-
+    if (res.shouldTriggerAlarmSound) {
+      // COINCIDENZA DUAL-TRIGGER: Tocco (|A_dyn| >= 3.2 m/s²) + Anomalia EMF (|Z| >= 3.5σ)
+      // Unica condizione abilitata all'emissione del suono di allarme personalizzato!
+      _playAlarmSound();
       _forensicLogger.logTrigger(
         res,
         pressureHpa: _currentPressure,
         audioPeakHz: _audioPeakHz,
         audioPeakDbfs: _audioPeakDbfs,
-        lemma: lemma,
       );
-      _playAlertBeep(1200, 100);
-    } else if (res.isArtifact) {
-      _forensicLogger.logTrigger(res, pressureHpa: _currentPressure);
+    } else if (res.isEnvironmentalAnomaly) {
+      // Anomalia metrologica pura (|Z| >= 3.5σ ma nessun tocco): registrazione forense senza suono tocco
+      _forensicLogger.logTrigger(
+        res,
+        pressureHpa: _currentPressure,
+        audioPeakHz: _audioPeakHz,
+        audioPeakDbfs: _audioPeakDbfs,
+      );
+    } else if (res.isMechanicalTouch) {
+      // Urto o contatto meccanico sul telaio senza anomalia EMF contemporanea
+      _forensicLogger.logTrigger(
+        res,
+        pressureHpa: _currentPressure,
+      );
     }
 
     if (mounted) setState(() => _lastTriggerResult = res);
+  }
+
+  void _playAlarmSound() {
+    try {
+      _audioChannel.invokeMethod('playCreepyLaugh');
+    } catch (_) {
+      _playAlertBeep(1200, 200);
+    }
   }
 
   void _handleAccelSample(double dynamicAccel) {

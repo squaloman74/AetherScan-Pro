@@ -52,36 +52,51 @@ void main() {
 
       final trigger1 = TriggerResult(
         timestamp: now,
-        classification: TriggerClassification.validAnomaly,
+        classification: TriggerClassification.environmentalAnomaly,
         rawEmf: 55.0,
         deltaEmf: 13.0,
         zScoreEmf: 8.66,
         snrDbEmf: 18.7,
         rawDynamicAccel: 0.04,
         zScoreAccel: 0.0,
-        isBumpDetected: false,
+        isPhysicalTouch: false,
         persistenceMs: 250,
-        deterministicLemmaIndex: 42,
       );
 
       final trigger2 = TriggerResult(
         timestamp: now.add(const Duration(seconds: 1)),
-        classification: TriggerClassification.mechanicalArtifact,
+        classification: TriggerClassification.mechanicalTouch,
         rawEmf: 60.0,
         deltaEmf: 18.0,
         zScoreEmf: 12.0,
         snrDbEmf: 21.5,
         rawDynamicAccel: 0.55,
         zScoreAccel: 51.0,
-        isBumpDetected: true,
+        isPhysicalTouch: true,
         persistenceMs: 0,
       );
 
-      logger.logTrigger(trigger1, lemma: 'SPIRITO', audioPeakHz: 1240.0, audioPeakDbfs: -18.5);
-      logger.logTrigger(trigger2);
+      final trigger3 = TriggerResult(
+        timestamp: now.add(const Duration(seconds: 2)),
+        classification: TriggerClassification.dualTriggerInteraction,
+        rawEmf: 58.0,
+        deltaEmf: 16.0,
+        zScoreEmf: 10.66,
+        snrDbEmf: 20.1,
+        rawDynamicAccel: 3.5,
+        zScoreAccel: 345.0,
+        isPhysicalTouch: true,
+        persistenceMs: 200,
+      );
 
-      expect(logger.totalEntries, equals(2));
-      expect(logger.validAnomaliesCount, equals(1));
+      logger.logTrigger(trigger1, audioPeakHz: 1240.0, audioPeakDbfs: -18.5);
+      logger.logTrigger(trigger2);
+      logger.logTrigger(trigger3);
+
+      expect(logger.totalEntries, equals(3));
+      // environmentalAnomaly (1) + dualTriggerInteraction (1) = 2
+      expect(logger.validAnomaliesCount, equals(2));
+      // mechanicalTouch (1) = 1
       expect(logger.artifactCount, equals(1));
     });
 
@@ -90,20 +105,20 @@ void main() {
 
       logger.logTrigger(TriggerResult(
         timestamp: now,
-        classification: TriggerClassification.validAnomaly,
+        classification: TriggerClassification.environmentalAnomaly,
         rawEmf: 50.0,
         deltaEmf: 8.0,
         zScoreEmf: 5.33,
         snrDbEmf: 14.5,
         rawDynamicAccel: 0.04,
         zScoreAccel: 0.0,
-        isBumpDetected: false,
+        isPhysicalTouch: false,
         persistenceMs: 180,
       ));
 
       final csv = logger.exportCsv();
       expect(csv.contains('Session_ID: ASPRO-TEST-001'), isTrue);
-      expect(csv.contains('validAnomaly'), isTrue);
+      expect(csv.contains('environmentalAnomaly'), isTrue);
       expect(csv.contains('50.00,8.00,5.33,14.5'), isTrue);
 
       final checksum = logger.computeSessionChecksum();

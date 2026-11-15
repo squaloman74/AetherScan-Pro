@@ -27,16 +27,15 @@ void main() {
     engine = DeterministicTriggerEngine(
       baseline: testBaseline,
       zThreshold: 3.5, // 3.5 sigma = 40.0 + 7.0 = 47.0 uT
-      bumpZThreshold: 2.5,
+      touchAccelThreshold: 3.2, // Soglia contatto/pressione: 3.2 m/s²
       minPersistenceMs: 150,
-      lemmaPoolSize: 98,
     );
   });
 
-  group('DeterministicTriggerEngine Unit Tests', () {
-    test('Rumore ordinario sotto soglia 3.5 sigma viene classificato come none', () {
+  group('DeterministicTriggerEngine (Dual-Trigger & Metrology) Unit Tests', () {
+    test('1. Rumore ordinario sotto soglia 3.5 sigma senza tocco -> classification none, NO ALARM', () {
       final now = DateTime.now();
-      // 44.0 uT => delta = +4.0 uT => Z = 4.0 / 2.0 = 2.0 (< 3.5)
+      // 44.0 uT => delta = +4.0 uT => Z = 4.0 / 2.0 = 2.0 (< 3.5), vib = 0.05 m/s² (< 3.2)
       final reading = SensorReading(
         timestamp: now,
         emfMagnitude: 44.0,
@@ -47,9 +46,28 @@ void main() {
       expect(result.classification, equals(TriggerClassification.none));
       expect(result.zScoreEmf, closeTo(2.0, 1e-6));
       expect(result.isAnomaly, isFalse);
+      expect(result.isPhysicalTouch, isFalse);
+      expect(result.shouldTriggerAlarmSound, isFalse);
     });
 
-    test('Transitorio impulsivo (< 150 ms) viene marcato come transientSpike', () {
+    test('2. Solo tocco meccanico/pressione telaio (>= 3.2 m/s²) SENZA anomalia EMF -> mechanicalTouch, NO ALARM', () {
+      final now = DateTime.now();
+      // EMF ordinario (41.0 uT => Z = 0.5 < 3.5), ma forte tocco sul telaio (3.6 m/s² >= 3.2)
+      final reading = SensorReading(
+        timestamp: now,
+        emfMagnitude: 41.0,
+        dynamicAcceleration: 3.6,
+      );
+
+      final result = engine.evaluate(reading);
+      expect(result.classification, equals(TriggerClassification.mechanicalTouch));
+      expect(result.isMechanicalTouch, isTrue);
+      expect(result.isPhysicalTouch, isTrue);
+      expect(result.isAnomaly, isFalse);
+      expect(result.shouldTriggerAlarmSound, isFalse); // NESSUN ALLARME ACUSTICO
+    });
+
+    test('3. Spike EMF impulsivo non persistente (< 150 ms) -> transientSpike, NO ALARM', () {
       final now = DateTime.now();
       // 50.0 uT => delta = +10.0 uT => Z = 10.0 / 2.0 = 5.0 (>= 3.5)
       final r1 = SensorReading(
@@ -62,13 +80,13 @@ void main() {
       // Primo campione: persistenza = 0 ms (< 150 ms)
       expect(res1.classification, equals(TriggerClassification.transientSpike));
       expect(res1.zScoreEmf, closeTo(5.0, 1e-6));
-      expect(res1.isAnomaly, isFalse);
+      expect(res1.shouldTriggerAlarmSound, isFalse);
     });
 
-    test('Anomalia persistente (>= 150 ms) viene convalidata come validAnomaly', () {
+    test('4. Solo anomalia EMF persistente (>= 150 ms) SENZA tocco -> environmentalAnomaly, CSV Log, NO ALARM', () {
       final now = DateTime.now();
 
-      // Campione 0ms
+      // Campione 0ms (Z = 6.0 >= 3.5)
       engine.evaluate(SensorReading(
         timestamp: now,
         emfMagnitude: 52.0,
@@ -89,61 +107,57 @@ void main() {
         emfMagnitude: 52.0,
         dynamicAcceleration: 0.05,
       ));
-      expect(res3.classification, equals(TriggerClassification.validAnomaly));
-      expect(res3.isAnomaly, isTrue);
-      expect(res3.deterministicLemmaIndex, isNotNull);
-      expect(res3.deterministicLemmaIndex!, inInclusiveRange(0, 97));
+      expect(res3.classification, equals(TriggerClassification.environmentalAnomaly));
+      expect(res3.isEnvironmentalAnomaly, isTrue);
+      expect(res3.isPhysicalTouch, isFalse);
+      expect(res3.shouldTriggerAlarmSound, isFalse); // Anomalia metrologica pura: NO allarme da tocco
     });
 
-    test('Filtro Anti-Bump: urto dell\'accelerometro blocca e declassa ad artefatto meccanico', () {
+    test('5. COINCIDENZA DUAL-TRIGGER: Tocco fisico (>= 3.2 m/s²) + Anomalia EMF (>= 3.5σ, >= 150 ms) -> ALARM SOUND TRIGGERED!', () {
       final now = DateTime.now();
 
-      // Spike EMF alto (55 uT, Z = 7.5), ma con contemporaneo urto dinamico (0.50 m/s², baseline 0.05, sd 0.02 => Z = 22.5)
-      final bumpReading = SensorReading(
+      // Campione iniziale per stabilire l'anomalia EMF
+      engine.evaluate(SensorReading(
+        timestamp: now,
+        emfMagnitude: 54.0, // Z = (54-40)/2 = 7.0
+        dynamicAcceleration: 3.5, // Tocco simultaneo
+      ));
+
+      // Campione dopo 160ms (persistenza raggiunta + tocco attivo)
+      final resDual = engine.evaluate(SensorReading(
+        timestamp: now.add(const Duration(milliseconds: 160)),
+        emfMagnitude: 54.0,
+        dynamicAcceleration: 3.5, // Tocco contemporaneo
+      ));
+
+      expect(resDual.classification, equals(TriggerClassification.dualTriggerInteraction));
+      expect(resDual.isDualTrigger, isTrue);
+      expect(resDual.isPhysicalTouch, isTrue);
+      expect(resDual.isAnomaly, isTrue);
+      // QUESTA È L'UNICA CONDIZIONE CHE DEVE ATTIVARE L'AUDIO:
+      expect(resDual.shouldTriggerAlarmSound, isTrue);
+    });
+
+    test('6. Ripristino stato e azzeramento deterministico', () {
+      final now = DateTime.now();
+      engine.evaluate(SensorReading(
         timestamp: now,
         emfMagnitude: 55.0,
-        dynamicAcceleration: 0.50,
-      );
-
-      final result = engine.evaluate(bumpReading);
-      expect(result.classification, equals(TriggerClassification.mechanicalArtifact));
-      expect(result.isBumpDetected, isTrue);
-      expect(result.isAnomaly, isFalse);
-      expect(result.isArtifact, isTrue);
-    });
-
-    test('Determinismo puro (Anti-RNG): gli stessi valori fisici producono identico indice di lemma', () {
-      final now = DateTime.now();
-
-      final readingA = SensorReading(
-        timestamp: now,
-        emfMagnitude: 54.2,
-        dynamicAcceleration: 0.05,
-        pressureHpa: 1014.1,
-      );
-
-      // Simula persistenza
-      engine.evaluate(readingA);
-      final resA = engine.evaluate(SensorReading(
-        timestamp: now.add(const Duration(milliseconds: 200)),
-        emfMagnitude: 54.2,
-        dynamicAcceleration: 0.05,
-        pressureHpa: 1014.1,
+        dynamicAcceleration: 3.5,
       ));
+      expect(engine.consecutiveAnomalySamples, equals(1));
 
-      // Resetta motore ed esegui nuovamente la stessa identica sequenza fisica
       engine.reset();
-      engine.evaluate(readingA);
-      final resB = engine.evaluate(SensorReading(
-        timestamp: now.add(const Duration(milliseconds: 200)),
-        emfMagnitude: 54.2,
-        dynamicAcceleration: 0.05,
-        pressureHpa: 1014.1,
-      ));
+      expect(engine.consecutiveAnomalySamples, equals(0));
 
-      expect(resA.classification, equals(TriggerClassification.validAnomaly));
-      expect(resB.classification, equals(TriggerClassification.validAnomaly));
-      expect(resA.deterministicLemmaIndex, equals(resB.deterministicLemmaIndex));
+      // Dopo reset, un campione sotto soglia torna a none
+      final resClean = engine.evaluate(SensorReading(
+        timestamp: now.add(const Duration(seconds: 1)),
+        emfMagnitude: 40.0,
+        dynamicAcceleration: 0.04,
+      ));
+      expect(resClean.classification, equals(TriggerClassification.none));
+      expect(resClean.shouldTriggerAlarmSound, isFalse);
     });
   });
 }
