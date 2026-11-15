@@ -1,7 +1,7 @@
 # ◈ Guida all'Installazione: AetherScan-Pro v27-beta2
 
 Pacchetti ufficiali compilati per il rilascio e dispiegamento operativo sul campo.
-Calibrazione manuale su richiesta dell'operatore (nessun overlay forzato all'avvio).
+UI ottimizzata e snella con calibrazione concentrata unicamente nei punti essenziali.
 
 ---
 
@@ -13,8 +13,8 @@ Calibrazione manuale su richiesta dell'operatore (nessun overlay forzato all'avv
   2. Apri il file manager del telefono e tocca l'APK.
   3. Se richiesto dal sistema, autorizza l'opzione **"Installa app sconosciute"** per quell'app/browser.
   4. Conferma l'installazione e avvia AetherScan-Pro.
-  5. **Avvio Immediato:** All'avvio la schermata è subito libera e utilizzabile con la baseline standard.
-  6. **Calibrazione Manuale:** Quando sei pronto e desideri campionare la stanza, premi il pulsante **"CALIBRA (30s)"** nella barra in alto, nel drawer o nel banner principale.
+  5. **Interfaccia Pulita:** Nessun popup o banner invadente all'avvio. Lo strumento è subito operativo.
+  6. **Calibrazione a Comando:** Quando desideri campionare la baseline ambientale, usa l'icona calibrazione nella barra in alto oppure il pulsante nel menu Drawer.
 
 ---
 
@@ -42,5 +42,5 @@ Prima dell'installazione peritali o indagini ufficiali, puoi verificare l'impron
 Get-FileHash .\AetherScan-Pro-v27-beta2-Metrology.apk -Algorithm SHA256
 ```
 Impronte certificate ufficiali:
-* **APK (Android):** `73C0C374358FCC560D3CFC5E4F6818FF2FAD5D50EDD845746F363D534587922E`
+* **APK (Android):** `6858AE65C28AAC51942BE31B4154CAFA4D23804531C7BDDCF9E379AB60D70CC5`
 * **IPA (iOS):** `5C309F2B35104E66080713B29EC9445EF9CC574378F656C6F44691969A42E050`
