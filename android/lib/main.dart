@@ -134,6 +134,22 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       zThreshold: 3.5,
       touchAccelThreshold: 3.2,
       minPersistenceMs: 150,
+      baseline: BaselineProfile(
+        calibratedAt: now,
+        duration: Duration.zero,
+        totalSamples: 1,
+        emfMean: 42.0,
+        emfStdDev: 2.0,
+        emfMin: 38.0,
+        emfMax: 46.0,
+        vibMean: 0.04,
+        vibStdDev: 0.02,
+        vibMax: 0.1,
+        baroMean: 1013.25,
+        baroStdDev: 0.1,
+        baroMin: 1013.0,
+        baroMax: 1013.5,
+      ),
     );
 
     _dspChain = AnalyticalDSPChain(sampleRate: 48000.0);
@@ -148,8 +164,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       _loadHwid();
       _startSensorStream();
       _startAudioProcessingLoop();
-      // Avvio automatico della calibrazione iniziale (30s)
-      _startCalibration();
+      // Nessuna calibrazione forzata all'avvio: l'app si apre pulita e immediatamente fruibile.
+      // L'operatore può avviare la calibrazione premendo il pulsante dedicato.
     });
   }
 
@@ -538,6 +554,35 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               Navigator.pop(context);
             },
           ),
+          const Divider(color: IndustrialPalette.border),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.tune, size: 16),
+              label: Text(
+                _baselineEngine.isCalibrated ? 'RICALIBRA BASELINE (30s)' : 'AVVIA CALIBRAZIONE (30s)',
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _baselineEngine.isCalibrated
+                    ? IndustrialPalette.surfaceLight
+                    : IndustrialPalette.alertAmber.withValues(alpha: 0.2),
+                foregroundColor: _baselineEngine.isCalibrated
+                    ? IndustrialPalette.phosphorGreen
+                    : IndustrialPalette.alertAmber,
+                side: BorderSide(
+                  color: _baselineEngine.isCalibrated
+                      ? IndustrialPalette.phosphorGreen
+                      : IndustrialPalette.alertAmber,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _startCalibration();
+              },
+            ),
+          ),
           const Spacer(),
           const Divider(color: IndustrialPalette.border),
           Padding(
@@ -615,28 +660,46 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               ],
             ),
             const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: _baselineEngine.isCalibrated
-                    ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.15)
-                    : IndustrialPalette.alertAmber.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
+            InkWell(
+              onTap: _startCalibration,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
                   color: _baselineEngine.isCalibrated
-                      ? IndustrialPalette.phosphorGreen
-                      : IndustrialPalette.alertAmber,
+                      ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.15)
+                      : IndustrialPalette.alertAmber.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: _baselineEngine.isCalibrated
+                        ? IndustrialPalette.phosphorGreen
+                        : IndustrialPalette.alertAmber,
+                    width: 1.2,
+                  ),
                 ),
-              ),
-              child: Text(
-                _baselineEngine.isCalibrated ? 'CALIBRATED' : 'UNCALIBRATED',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                  color: _baselineEngine.isCalibrated
-                      ? IndustrialPalette.phosphorGreen
-                      : IndustrialPalette.alertAmber,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _baselineEngine.isCalibrated ? Icons.check_circle : Icons.tune,
+                      size: 12,
+                      color: _baselineEngine.isCalibrated
+                          ? IndustrialPalette.phosphorGreen
+                          : IndustrialPalette.alertAmber,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _baselineEngine.isCalibrated ? 'CALIBRATO' : 'CALIBRA (30s)',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: _baselineEngine.isCalibrated
+                            ? IndustrialPalette.phosphorGreen
+                            : IndustrialPalette.alertAmber,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -703,6 +766,47 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Banner discreto e non bloccante per avviare la calibrazione a comando
+          if (!_baselineEngine.isCalibrated)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: IndustrialPalette.alertAmber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: IndustrialPalette.alertAmber.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.tune, color: IndustrialPalette.alertAmber, size: 14),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Baseline standard attiva. Tocca per profilare l\'ambiente.',
+                      style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: IndustrialPalette.alertAmber),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _startCalibration,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'CALIBRA (30s)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: IndustrialPalette.phosphorCyan,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // ── 1. Telemetry Cards Row ──
           Row(
             children: [
