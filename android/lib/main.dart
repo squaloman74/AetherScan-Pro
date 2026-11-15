@@ -9,6 +9,17 @@ import 'trigger_logic.dart';
 import 'audio_suite.dart';
 import 'forensic_logger.dart';
 import 'industrial_ui.dart';
+import 'spectral_sweep_engine.dart';
+import 'spectral_sweep_view.dart';
+
+/// Modalità operative selezionabili dal Menu Hamburger
+enum AppOperatingMode {
+  /// Suite severa: grafici puri, Z-Score >= 3.5σ, Log CSV SHA-256 e Coincidenza Dual-Trigger
+  metrologyPro,
+
+  /// Modalità interattiva per Live: scansione radiofonica continua accoppiata ai sensori reali
+  spectralSweep,
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +87,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   String _deviceHwid = 'INITIALIZING...';
   bool _isAuthorized = false;
 
+  // ── Modalità Operativa e Scansione Spettrale ──
+  AppOperatingMode _activeMode = AppOperatingMode.metrologyPro;
+  late final SpectralSweepEngine _spectralSweepEngine;
+  SweepFrame? _lastSweepFrame;
+
   @override
   void initState() {
     super.initState();
@@ -122,6 +138,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
     _dspChain = AnalyticalDSPChain(sampleRate: 48000.0);
     _fftEngine = FFTSpectrumEngine(fftSize: 512, sampleRate: 48000.0);
+    _spectralSweepEngine = SpectralSweepEngine(
+      sampleRate: 48000.0,
+      band: SweepBand.fm,
+      sweepIntervalMs: 100,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadHwid();
@@ -270,16 +291,33 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     _dspSimulationTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
       if (!mounted) return;
 
-      // Generazione buffer di test / microfonico
-      final buffer = List<double>.generate(512, (i) {
-        final t = i / 48000.0;
-        final baseNoise = (Random().nextDouble() - 0.5) * 0.002;
-        // Se c'è anomalia valida, simula picco spettrale coerente
-        final anomalySig = (_lastTriggerResult?.isAnomaly ?? false)
-            ? sin(2.0 * pi * 1420.0 * t) * 0.15
-            : 0.0;
-        return _dspChain.process(baseNoise + anomalySig);
-      });
+      final base = _baselineEngine.activeProfile;
+      final deltaEmf = base != null ? _currentEmf - base.emfMean : 0.0;
+      final zScore = _lastTriggerResult?.zScoreEmf ?? 0.0;
+
+      List<double> buffer;
+      if (_activeMode == AppOperatingMode.spectralSweep) {
+        // Scansione spettrale deterministica pilotata dai sensori reali
+        final frame = _spectralSweepEngine.processFrame(
+          now: DateTime.now(),
+          deltaEmf: deltaEmf,
+          zScoreEmf: zScore,
+          dynamicAccel: _currentDynamicVib,
+          bufferSize: 512,
+        );
+        _lastSweepFrame = frame;
+        buffer = frame.audioBuffer;
+      } else {
+        // Generazione metrologica standard
+        buffer = List<double>.generate(512, (i) {
+          final t = i / 48000.0;
+          final baseNoise = (Random().nextDouble() - 0.5) * 0.002;
+          final anomalySig = (_lastTriggerResult?.isAnomaly ?? false)
+              ? sin(2.0 * pi * 1420.0 * t) * 0.15
+              : 0.0;
+          return _dspChain.process(baseNoise + anomalySig);
+        });
+      }
 
       final fftResult = _fftEngine.analyze(buffer);
       if (!mounted) return;
@@ -394,6 +432,136 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     _showToast('Dataset JSON Forense copiato negli appunti!');
   }
 
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      backgroundColor: IndustrialPalette.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              color: IndustrialPalette.background,
+              border: Border(bottom: BorderSide(color: IndustrialPalette.border, width: 1.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.show_chart, color: IndustrialPalette.phosphorCyan, size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      'AETHERSCAN-PRO',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        fontFamily: 'monospace',
+                        color: IndustrialPalette.textWhite,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'v27-beta2 • SCIENTIFIC METROLOGY',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                    fontFamily: 'monospace',
+                    color: IndustrialPalette.phosphorCyan,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _baselineEngine.isCalibrated
+                        ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.15)
+                        : IndustrialPalette.alertAmber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _baselineEngine.isCalibrated
+                          ? IndustrialPalette.phosphorGreen
+                          : IndustrialPalette.alertAmber,
+                    ),
+                  ),
+                  child: Text(
+                    _baselineEngine.isCalibrated ? 'CALIBRATED BASELINE' : 'UNCALIBRATED SENSORS',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: _baselineEngine.isCalibrated
+                          ? IndustrialPalette.phosphorGreen
+                          : IndustrialPalette.alertAmber,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.analytics, color: IndustrialPalette.phosphorCyan),
+            title: const Text(
+              'Metrology Pro',
+              style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            subtitle: const Text(
+              'Suite severa, grafici puri, Z-Score 3.5σ, log RFC 4180 CSV con SHA-256 e coincidenza Dual-Trigger.',
+              style: TextStyle(fontSize: 10, color: IndustrialPalette.textMuted),
+            ),
+            selected: _activeMode == AppOperatingMode.metrologyPro,
+            selectedTileColor: IndustrialPalette.surfaceLight,
+            onTap: () {
+              setState(() => _activeMode = AppOperatingMode.metrologyPro);
+              Navigator.pop(context);
+            },
+          ),
+          const Divider(color: IndustrialPalette.border),
+          ListTile(
+            leading: const Icon(Icons.radio, color: IndustrialPalette.alertAmber),
+            title: const Text(
+              'AM/FM Spectral Sweep',
+              style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            subtitle: const Text(
+              'Scansione radio live accoppiata in tempo reale ai sensori fisici. Zero dizionari o voci simulate.',
+              style: TextStyle(fontSize: 10, color: IndustrialPalette.textMuted),
+            ),
+            selected: _activeMode == AppOperatingMode.spectralSweep,
+            selectedTileColor: IndustrialPalette.surfaceLight,
+            onTap: () {
+              setState(() => _activeMode = AppOperatingMode.spectralSweep);
+              Navigator.pop(context);
+            },
+          ),
+          const Spacer(),
+          const Divider(color: IndustrialPalette.border),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'HWID: $_deviceHwid',
+                  style: const TextStyle(fontSize: 9.5, fontFamily: 'monospace', color: IndustrialPalette.textMuted),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'FIPS PUB 180-4 SHA-256 INTEGRITY',
+                  style: TextStyle(fontSize: 9.5, fontFamily: 'monospace', color: IndustrialPalette.phosphorGreen),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final base = _baselineEngine.activeProfile;
@@ -403,18 +571,25 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     final isBump = _lastTriggerResult?.isBumpDetected ?? false;
 
     return Scaffold(
+      drawer: _buildDrawer(context),
       appBar: AppBar(
         backgroundColor: IndustrialPalette.surface,
         elevation: 0,
         title: Row(
           children: [
-            const Icon(Icons.show_chart, color: IndustrialPalette.phosphorCyan, size: 20),
+            Icon(
+              _activeMode == AppOperatingMode.metrologyPro ? Icons.show_chart : Icons.radio,
+              color: _activeMode == AppOperatingMode.metrologyPro
+                  ? IndustrialPalette.phosphorCyan
+                  : IndustrialPalette.alertAmber,
+              size: 20,
+            ),
             const SizedBox(width: 8),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                const Text(
                   'AETHERSCAN-PRO',
                   style: TextStyle(
                     fontSize: 13,
@@ -424,10 +599,14 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                   ),
                 ),
                 Text(
-                  'v27-beta2 • METROLOGY',
+                  _activeMode == AppOperatingMode.metrologyPro
+                      ? 'v27-beta2 • METROLOGY PRO'
+                      : 'v27-beta2 • SPECTRAL SWEEP',
                   style: TextStyle(
                     fontSize: 8.5,
-                    color: IndustrialPalette.phosphorCyan,
+                    color: _activeMode == AppOperatingMode.metrologyPro
+                        ? IndustrialPalette.phosphorCyan
+                        : IndustrialPalette.alertAmber,
                     letterSpacing: 1.0,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
@@ -469,231 +648,37 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             tooltip: 'Ricalibra Baseline (30s)',
             onPressed: _startCalibration,
           ),
-          IconButton(
-            icon: const Icon(Icons.security, color: IndustrialPalette.phosphorCyan),
-            tooltip: 'Impronta SHA-256 Sessione',
-            onPressed: _showChecksumDialog,
-          ),
+          if (_activeMode == AppOperatingMode.metrologyPro)
+            IconButton(
+              icon: const Icon(Icons.security, color: IndustrialPalette.phosphorCyan),
+              tooltip: 'Impronta SHA-256 Sessione',
+              onPressed: _showChecksumDialog,
+            ),
         ],
       ),
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── 1. Telemetry Cards Row ──
-                Row(
-                  children: [
-                    Expanded(
-                      child: IndustrialTelemetryCard(
-                        label: 'EMF Modulo',
-                        value: _currentEmf.toStringAsFixed(1),
-                        unit: 'µT',
-                        delta: 'Δ ${deltaEmf >= 0 ? '+' : ''}${deltaEmf.toStringAsFixed(1)} (Z=${zScore.toStringAsFixed(1)})',
-                        accentColor: (_lastTriggerResult?.isAnomaly ?? false)
-                            ? IndustrialPalette.alertRed
-                            : IndustrialPalette.phosphorCyan,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: IndustrialTelemetryCard(
-                        label: 'Vibrazione',
-                        value: _currentDynamicVib.toStringAsFixed(2),
-                        unit: 'm/s²',
-                        delta: isBump ? 'URTO RILEVATO' : 'STATO FERMO',
-                        accentColor: isBump
-                            ? IndustrialPalette.alertAmber
-                            : IndustrialPalette.phosphorGreen,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: IndustrialTelemetryCard(
-                        label: 'Pressione',
-                        value: _currentPressure.toStringAsFixed(1),
-                        unit: 'hPa',
-                        delta: 'Stato Atmosferico',
-                        accentColor: IndustrialPalette.textWhite,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: IndustrialTelemetryCard(
-                        label: 'SNR / Audio Peak',
-                        value: snrDb.toStringAsFixed(1),
-                        unit: 'dB',
-                        delta: '${_audioPeakHz.round()} Hz (${_audioPeakDbfs.round()} dBFS)',
-                        accentColor: snrDb >= 15.0
-                            ? IndustrialPalette.phosphorCyan
-                            : IndustrialPalette.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // ── 2. Oscilloscopio Vettoriale & Spettrogramma ──
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: IndustrialPalette.surface,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: IndustrialPalette.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: IndustrialPalette.border)),
-                          ),
-                          child: const Row(
-                            children: [
-                              Text(
-                                'OSCILLOSCOPIO VETTORIALE (EMF µT)',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: IndustrialPalette.textMuted,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                              Spacer(),
-                              Text(
-                                'CAMPIONAMENTO REAL-TIME',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: IndustrialPalette.phosphorGreen,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
-                            child: CustomPaint(
-                              painter: IndustrialOscilloscopePainter(
-                                history: _emfOscilloscopeHistory,
-                                baselineMean: base?.emfMean ?? 40.0,
-                                baselineStdDev: base?.emfStdDev ?? 2.0,
-                                minY: max(0.0, (base?.emfMean ?? 40.0) - 20.0),
-                                maxY: (base?.emfMean ?? 40.0) + 40.0,
-                                traceColor: (_lastTriggerResult?.isAnomaly ?? false)
-                                    ? IndustrialPalette.alertRed
-                                    : IndustrialPalette.phosphorCyan,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // ── 3. Spettrogramma FFT in dBFS ──
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: IndustrialPalette.surface,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: IndustrialPalette.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: IndustrialPalette.border)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Text(
-                                'SPETTROGRAMMA FFT (dBFS) • NOTCH 50Hz ATTIVO',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: IndustrialPalette.textMuted,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                'Picco: ${_audioPeakHz.round()} Hz',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: IndustrialPalette.phosphorCyan,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
-                            child: CustomPaint(
-                              painter: IndustrialSpectrumPainter(
-                                magnitudesDbfs: _currentFftDbfs.take(64).toList(),
-                                peakFrequencyHz: _audioPeakHz,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // ── 4. Forensic Action Buttons ──
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.table_view, size: 14),
-                        label: const Text('CSV RFC 4180', style: TextStyle(fontSize: 11, fontFamily: 'monospace')),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: IndustrialPalette.surfaceLight,
-                          foregroundColor: IndustrialPalette.phosphorCyan,
-                          side: const BorderSide(color: IndustrialPalette.border),
-                        ),
-                        onPressed: _exportCsvModal,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.code, size: 14),
-                        label: const Text('JSON FORENSE', style: TextStyle(fontSize: 11, fontFamily: 'monospace')),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: IndustrialPalette.surfaceLight,
-                          foregroundColor: IndustrialPalette.phosphorGreen,
-                          side: const BorderSide(color: IndustrialPalette.border),
-                        ),
-                        onPressed: _exportJsonModal,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          if (_activeMode == AppOperatingMode.metrologyPro)
+            _buildMetrologyProBody(base, deltaEmf, zScore, snrDb, isBump)
+          else
+            SpectralSweepView(
+              currentFrame: _lastSweepFrame,
+              currentBand: _spectralSweepEngine.band,
+              currentDirection: _spectralSweepEngine.direction,
+              sweepIntervalMs: _spectralSweepEngine.sweepIntervalMs,
+              currentEmf: _currentEmf,
+              deltaEmf: deltaEmf,
+              zScoreEmf: zScore,
+              currentDynamicAccel: _currentDynamicVib,
+              fftDbfs: _currentFftDbfs,
+              audioPeakHz: _audioPeakHz,
+              onBandChanged: (b) => setState(() => _spectralSweepEngine.setBand(b)),
+              onIntervalChanged: (ms) => setState(() => _spectralSweepEngine.setSweepInterval(ms)),
+              onToggleDirection: () => setState(() => _spectralSweepEngine.toggleDirection()),
+              onTogglePause: () => setState(() => _spectralSweepEngine.setPaused(_spectralSweepEngine.direction != SweepDirection.paused)),
             ),
-          ),
 
-          // ── 5. Overlay di Calibrazione 30 Secondi ──
+          // Overlay di Calibrazione 30 Secondi
           if (_isCalibrating)
             CalibrationOverlayWidget(
               progress: _calibrationProgress,
@@ -701,6 +686,229 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               sampleCount: _calibrationSamples,
               onCancel: () => _baselineEngine.cancelCalibration(),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetrologyProBody(
+    BaselineProfile? base,
+    double deltaEmf,
+    double zScore,
+    double snrDb,
+    bool isBump,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── 1. Telemetry Cards Row ──
+          Row(
+            children: [
+              Expanded(
+                child: IndustrialTelemetryCard(
+                  label: 'EMF Modulo',
+                  value: _currentEmf.toStringAsFixed(1),
+                  unit: 'µT',
+                  delta: 'Δ ${deltaEmf >= 0 ? '+' : ''}${deltaEmf.toStringAsFixed(1)} (Z=${zScore.toStringAsFixed(1)})',
+                  accentColor: (_lastTriggerResult?.isAnomaly ?? false)
+                      ? IndustrialPalette.alertRed
+                      : IndustrialPalette.phosphorCyan,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: IndustrialTelemetryCard(
+                  label: 'Vibrazione',
+                  value: _currentDynamicVib.toStringAsFixed(2),
+                  unit: 'm/s²',
+                  delta: isBump ? 'URTO RILEVATO' : 'STATO FERMO',
+                  accentColor: isBump
+                      ? IndustrialPalette.alertAmber
+                      : IndustrialPalette.phosphorGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: IndustrialTelemetryCard(
+                  label: 'Pressione',
+                  value: _currentPressure.toStringAsFixed(1),
+                  unit: 'hPa',
+                  delta: 'Stato Atmosferico',
+                  accentColor: IndustrialPalette.textWhite,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: IndustrialTelemetryCard(
+                  label: 'SNR / Audio Peak',
+                  value: snrDb.toStringAsFixed(1),
+                  unit: 'dB',
+                  delta: '${_audioPeakHz.round()} Hz (${_audioPeakDbfs.round()} dBFS)',
+                  accentColor: snrDb >= 15.0
+                      ? IndustrialPalette.phosphorCyan
+                      : IndustrialPalette.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── 2. Oscilloscopio Vettoriale & Spettrogramma ──
+          Expanded(
+            flex: 3,
+            child: Container(
+              decoration: BoxDecoration(
+                color: IndustrialPalette.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: IndustrialPalette.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: IndustrialPalette.border)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Text(
+                          'OSCILLOSCOPIO VETTORIALE (EMF µT)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: IndustrialPalette.textMuted,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        Spacer(),
+                        Text(
+                          'CAMPIONAMENTO REAL-TIME',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: IndustrialPalette.phosphorGreen,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
+                      child: CustomPaint(
+                        painter: IndustrialOscilloscopePainter(
+                          history: _emfOscilloscopeHistory,
+                          baselineMean: base?.emfMean ?? 40.0,
+                          baselineStdDev: base?.emfStdDev ?? 2.0,
+                          minY: max(0.0, (base?.emfMean ?? 40.0) - 20.0),
+                          maxY: (base?.emfMean ?? 40.0) + 40.0,
+                          traceColor: (_lastTriggerResult?.isAnomaly ?? false)
+                              ? IndustrialPalette.alertRed
+                              : IndustrialPalette.phosphorCyan,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // ── 3. Spettrogramma FFT in dBFS ──
+          Expanded(
+            flex: 2,
+            child: Container(
+              decoration: BoxDecoration(
+                color: IndustrialPalette.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: IndustrialPalette.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: IndustrialPalette.border)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'SPETTROGRAMMA FFT (dBFS) • NOTCH 50Hz ATTIVO',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: IndustrialPalette.textMuted,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Picco: ${_audioPeakHz.round()} Hz',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: IndustrialPalette.phosphorCyan,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
+                      child: CustomPaint(
+                        painter: IndustrialSpectrumPainter(
+                          magnitudesDbfs: _currentFftDbfs.take(64).toList(),
+                          peakFrequencyHz: _audioPeakHz,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── 4. Forensic Action Buttons ──
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.table_view, size: 14),
+                  label: const Text('CSV RFC 4180', style: TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: IndustrialPalette.surfaceLight,
+                    foregroundColor: IndustrialPalette.phosphorCyan,
+                    side: const BorderSide(color: IndustrialPalette.border),
+                  ),
+                  onPressed: _exportCsvModal,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.code, size: 14),
+                  label: const Text('JSON FORENSE', style: TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: IndustrialPalette.surfaceLight,
+                    foregroundColor: IndustrialPalette.phosphorGreen,
+                    side: const BorderSide(color: IndustrialPalette.border),
+                  ),
+                  onPressed: _exportJsonModal,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

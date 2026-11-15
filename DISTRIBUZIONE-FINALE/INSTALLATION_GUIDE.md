@@ -1,11 +1,12 @@
 # ◈ Guida all'Installazione: AetherScan-Pro v27-beta2
 
 Pacchetti ufficiali compilati per il rilascio e dispiegamento operativo sul campo.
+Include le due modalità operative: **Metrology Pro** e **AM/FM Spectral Sweep**.
 
 ---
 
 ## 📱 1. Installazione Android (.APK)
-* **File:** `AetherScan-Pro-v27-beta2-Metrology.apk` (45.6 MB)
+* **File:** `AetherScan-Pro-v27-beta2-Metrology.apk` (46.4 MB)
 * **Compatibilità:** Android 8.0+ (Oreo, Pie, 10, 11, 12, 13, 14, 15+)
 * **Procedura di installazione diretta:**
   1. Trasferisci il file `.apk` sullo smartphone (tramite cavo USB, WhatsApp, Telegram, Google Drive o browser).
@@ -13,6 +14,7 @@ Pacchetti ufficiali compilati per il rilascio e dispiegamento operativo sul camp
   3. Se richiesto dal sistema, autorizza l'opzione **"Installa app sconosciute"** per quell'app/browser.
   4. Conferma l'installazione e avvia AetherScan-Pro.
   5. All'avvio, mantieni il dispositivo fermo per i primi **30 secondi** per consentire al motore Welford di calibrare la baseline ambientale.
+  6. Usa il **menu hamburger (tre trattini in alto)** per alternare tra la suite **Metrology Pro** e la scansione **AM/FM Spectral Sweep**.
 
 ---
 
@@ -40,5 +42,5 @@ Prima dell'installazione peritali o indagini ufficiali, puoi verificare l'impron
 Get-FileHash .\AetherScan-Pro-v27-beta2-Metrology.apk -Algorithm SHA256
 ```
 Impronte certificate ufficiali:
-* **APK (Android):** `83D607EC8D8B41E0437B15582E8038B704F820F4580D8926A4AF6E609C6F4B68`
+* **APK (Android):** `93FADCFAC783EBAA08494F98C844E5C0D1B1EB9DF327E5FAA8C3EF0FFBD91B5A`
 * **IPA (iOS):** `5C309F2B35104E66080713B29EC9445EF9CC574378F656C6F44691969A42E050`
