@@ -1,0 +1,71 @@
+name: Build AetherScan Pro iOS (IPA) - v27-beta2 Metrology
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: ios-repo
+        run: flutter pub get
+
+      - name: Run Tests
+        working-directory: ios-repo
+        run: flutter test
+
+      - name: Build iOS Runner (Release unsigned)
+        working-directory: ios-repo
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package Payload and Create unsigned IPA
+        working-directory: ios-repo
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r AetherScan-Pro-v27-beta2-Metrology-unsigned.ipa Payload
+          mkdir -p release-ios
+          mv AetherScan-Pro-v27-beta2-Metrology-unsigned.ipa release-ios/
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AetherScan-Pro-v27-beta2-iOS-IPA
+          path: ios-repo/release-ios/*.ipa
+
+      - name: Create GitHub Release with v27-beta2 IPA
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v27-beta2
+          name: "AetherScan Pro v27-beta2 Metrology - iOS (IPA Unsigned)"
+          body: |
+            ## AetherScan Pro v2.0 (v27-beta2) — Release Ufficiale iOS
+            **Data build:** 15/11/2026
+            
+            ### Novità e Specifiche Metrologiche:
+            - ✅ **Plancia Metrology Pro**: Grafici scientifici puri, Z-Score ≥ 3.5σ, log RFC 4180 CSV con SHA-256.
+            - ✅ **Doppio Trigger Concomitante Obbligatorio**: Allarme acustico subordinato alla coincidenza simultanea tra urto fisico (|A_dyn| ≥ 3.2 m/s²) e anomalia metrologica (Z ≥ 3.5σ).
+            - ✅ **Zero Dizionari o Sintesi Fasulla**: Nessun generatore casuale o parola preimpostata.
+            - ✅ **AM/FM Spectral Sweep**: Radio sweep reattiva ai sensori con tasti dedicati [ REV ◀ ] e [ FWD ▶ ].
+            - ✅ **Calibrazione Welford 30s**: A richiesta dell'operatore, baseline terrestre standard di default all'avvio.
+          files: ios-repo/release-ios/*.ipa
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

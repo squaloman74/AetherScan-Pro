@@ -1,0 +1,52 @@
+name: Build AetherScan Pro Android (APK) - v27-beta2 Metrology
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: android
+        run: flutter pub get
+
+      - name: Run Tests
+        working-directory: android
+        run: flutter test
+
+      - name: Build APK (Release)
+        working-directory: android
+        run: flutter build apk --release
+
+      - name: Rename and Package APK
+        working-directory: android
+        run: |
+          mkdir -p release-android
+          cp build/app/outputs/flutter-apk/app-release.apk release-android/AetherScan-Pro-v27-beta2-Metrology.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AetherScan-Pro-v27-beta2-Android-APK
+          path: android/release-android/*.apk
