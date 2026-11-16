@@ -11,8 +11,9 @@ SHA256: 0CCE9F4AFBCB600BF5B3A3A529CC935DCFD7E7827ABEB2717ECB480743937EB7
 
 [iOS RELEASE IPA - UNSIGNED / SIDELOAD READY]
 File:   AetherScan-Pro-v27-beta2.3-Metrology-unsigned.ipa
-Dim:    8,515,595 bytes (8.1 MB)
-SHA256: FF44A523311C61142E84502755F01D8483BA8484E8CCF0BCDD6F0B3022EF535F
+Dim:    8,773,360 bytes (8.36 MB)
+Build:  GitHub Actions macOS Runner (Xcode + Flutter 3.x - Native ARM64)
+SHA256: 83BBCCD3E3410A055D728DA1000820586595871636CEB7CDB532B7590F567F3A
 
 [DOCUMENTAZIONE METROLOGICA]
 File:   MANUALE_OPERATIVO_AETHERSCAN_PRO_v27.pdf
@@ -21,7 +22,7 @@ SHA256: 6BB71CEC24A0707A7E2FFBA57465EB4E6FCB6F2A3057EAB9BFB79F500991466B
 ================================================================================
 VERIFICA INTEGRITÀ:
 PowerShell:
-  Get-FileHash -Algorithm SHA256 .\AetherScan-Pro-v27-beta2.3-Metrology.apk
+  Get-FileHash -Algorithm SHA256 .\AetherScan-Pro-v27-beta2.3-Metrology-unsigned.ipa
 Linux/macOS:
-  sha256sum AetherScan-Pro-v27-beta2.3-Metrology.apk
+  sha256sum AetherScan-Pro-v27-beta2.3-Metrology-unsigned.ipa
 ================================================================================
