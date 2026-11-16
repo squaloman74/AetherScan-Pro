@@ -1,42 +1,27 @@
-# AetherScan-Pro v27-beta2.3 (Build 2.0.27+5) — Guida di Installazione
+# AetherScan-Pro v27-beta2.4 (Build 2.0.27+6) — Guida di Installazione
 
 ## Panoramica della Release
-- **Versione:** `v27-beta2.3`
-- **Build:** `2.0.27+5`
-- **Novità Principali:**
-  1. **UI Header Compatto & Pulito:** Risolto l'overlap visivo nell'AppBar tra il badge `CAL/UNCAL` e la titolazione dell'app.
-  2. **Interfaccia Pulita:** Rimozione di qualsiasi stringa/identificativo personale di repository dalla visualizzazione utente ("Canale Ufficiale: Release Certificata e Sicura").
-  3. **Verifica Aggiornamenti Live:** Tasto "VERIFICA AGGIORNAMENTI" integrato che interroga in tempo reale l'endpoint ufficiale e notifica istantaneamente la disponibilità di nuove release.
-  4. **Esportazione Forense Certificata:** Esportazione diretta di file fisici su disco `CSV RFC 4180` e `JSON Forense` tramite Share Sheet di sistema, con fallback automatico e sicuro negli appunti del dispositivo.
-  5. **Controlli Indipendenti:** Spectral Sweep AM/FM e Metrology Pro partono spenti (STANDBY) e sono attivabili on-demand dall'operatore.
+- **Versione:** `v27-beta2.4`
+- **Build:** `2.0.27+6`
+- **Novità e Risoluzioni:**
+  1. **Motore Audio Sweep Reale su iOS:** Risolto il silenzio su iPhone. Riproduzione reale e continua del fruscio statico radio AM/FM filtrato sull'altoparlante principale (`.defaultToSpeaker`).
+  2. **Accelerometro Reale iPhone in m/s²:** Risolta l'assenza di risposta agli urti. Il sensore hardware CoreMotion ora trasmette un flusso continuo in unità metriche standard $m/s^2$ uniformi ad Android.
+  3. **Feedback Acustico Urto Fisico:** Ogni colpo o urto sul telaio (`|A_dyn| >= 3.2 m/s²`) genera ora un feedback acustico immediato e la dicitura visiva `URTO RILEVATO` in arancione sulla plancia.
+  4. **Aggiornamento Diretto Senza Cavo (OTA):** Dal popup "VERIFICA AGGIORNAMENTI", se è presente una nuova release, compare il tasto **SCARICA ORA** che apre direttamente Safari su iPhone per scaricare l'IPA e installarlo via AltStore / Scarlet / TrollStore senza cavo USB.
+  5. **Doppio Trigger Concomitante:** L'allarme acustico forense scatta solo con la coincidenza simultanea di urto fisico e anomalia statistica ($Z \ge 3.5\sigma$).
 
 ---
 
 ## 1. Installazione Android (.apk)
-File: `AetherScan-Pro-v27-beta2.3-Metrology.apk`
-
-1. Trasferisci l'APK sul dispositivo (via USB, Drive, Telegram o browser).
-2. Se necessario, abilita l'opzione "Installa da origini sconosciute" per il file manager utilizzato.
-3. Tocca il file APK e seleziona **Installa** (o **Aggiorna** per sovrascrivere senza perdere configurazioni).
-4. All'avvio, concedi il permesso del **Microfono** per l'analisi spettrale FFT ambientale live.
+File: `AetherScan-Pro-v27-beta2.4-Metrology.apk`
+- Trasferisci o scarica l'APK sul dispositivo.
+- Tocca il file APK per installare/aggiornare.
 
 ---
 
-## 2. Installazione iOS (.ipa Sideloading)
-File: `AetherScan-Pro-v27-beta2.3-Metrology-unsigned.ipa`
-
-### Procedura con Sideloadly / AltStore / Scarlet:
-1. Connetti l'iPhone/iPad al computer via cavo Lightning/USB-C.
-2. Apri **Sideloadly** o **AltStore**.
-3. Trascina il file `AetherScan-Pro-v27-beta2.3-Metrology-unsigned.ipa` nell'applicazione.
-4. Inserisci il tuo Apple ID per la firma con certificato sviluppatore gratuito (7 giorni) o profilo enterprise/developer pagato.
-5. Clicca su **Start** / **Installa**.
-6. Sul dispositivo iOS, vai in:
-   * **Impostazioni > Generali > VPN e gestione dispositivo**
-   * Tocca il profilo associato al tuo Apple ID e seleziona **Autorizza / Attendibile**.
-7. All'apertura, concedi il permesso di accesso al **Microfono**.
-
----
-
-## 3. Checksum di Sicurezza (SHA-256)
-Consulta `SHA256_CHECKSUMS.txt` per verificare l'integrità crittografica di ogni singolo file prima dell'installazione.
+## 2. Installazione iOS Senza Cavo (.ipa)
+1. Apri AetherScan-Pro su iPhone.
+2. Apri il Drawer laterale e tocca **INFO E AGGIORNAMENTI**.
+3. Tocca **VERIFICA AGGIORNAMENTI**.
+4. Tocca il tasto verde **SCARICA ORA**: si aprirà Safari con il download diretto dell'IPA.
+5. In Safari, tocca il file scaricato > **Condividi** > **AltStore** (o Scarlet / TrollStore) per aggiornare direttamente sul dispositivo senza cavo PC.

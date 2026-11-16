@@ -13,6 +13,8 @@ import CoreMotion
   private let synth             = AVSpeechSynthesizer()
   private var audioPlayer       : AVAudioPlayer?
   private var creepyPlayer      : AVAudioPlayer?
+  private var staticPlayer      : AVAudioPlayer?
+  private var isStaticPlaying   = false
   private var channelRegistered = false
 
   // Sensori
@@ -149,7 +151,12 @@ import CoreMotion
       case "audioDiagnostic":
         result(self.buildDiagnostic())
 
-      case "startStatic", "stopStatic":
+      case "startStatic":
+        self.startRadioStatic()
+        result(true)
+
+      case "stopStatic":
+        self.stopRadioStatic()
         result(true)
 
       default:
@@ -220,14 +227,24 @@ import CoreMotion
       self.lastGravityY = alpha * self.lastGravityY + (1.0 - alpha) * data.acceleration.y
       self.lastGravityZ = alpha * self.lastGravityZ + (1.0 - alpha) * data.acceleration.z
 
-      let linearX = data.acceleration.x - self.lastGravityX
-      let linearY = data.acceleration.y - self.lastGravityY
-      let linearZ = data.acceleration.z - self.lastGravityZ
-      let impulse = sqrt(linearX*linearX + linearY*linearY + linearZ*linearZ)
+      // data.acceleration è in g (1g = 9.80665 m/s²). Convertiamo in m/s² per uniformità fisica e metrologica
+      let linearX = (data.acceleration.x - self.lastGravityX) * 9.80665
+      let linearY = (data.acceleration.y - self.lastGravityY) * 9.80665
+      let linearZ = (data.acceleration.z - self.lastGravityZ) * 9.80665
+      let impulse = sqrt(linearX * linearX + linearY * linearY + linearZ * linearZ)
 
-      // Soglia: 0.35 g (tocchetto secco/sfioramento, ma ignora movimento lento della mano)
+      // Invia flusso continuo di dinamica urto / vibrazione a Flutter
+      self.sensorEventSink?([
+        "type": "accel",
+        "dynamic_magnitude": impulse,
+        "x": linearX,
+        "y": linearY,
+        "z": linearZ
+      ])
+
+      // Soglia urto secco: 3.2 m/s²
       let now = Date().timeIntervalSince1970
-      if impulse > 0.35 && (now - self.lastTouchTriggerTime > 5.0) {
+      if impulse > 3.2 && (now - self.lastTouchTriggerTime > 2.0) {
         self.lastTouchTriggerTime = now
         self.log("TOUCH RILEVATO impulse=\(impulse)")
         self.sensorEventSink?(["type": "touch", "intensity": impulse])
@@ -288,11 +305,64 @@ import CoreMotion
   // ──────────────────────────────────────────────────────────────────
   private func setupAudioSession() {
     do {
-      try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-      try AVAudioSession.sharedInstance().setActive(true)
-      log("AudioSession .playback attiva")
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(.playback, mode: .default, options: [.mixWithOthers, .defaultToSpeaker])
+      try session.setActive(true)
+      log("AudioSession .playback attiva con defaultToSpeaker e mixWithOthers")
     } catch {
       log("AudioSession errore: \(error.localizedDescription)")
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Radio Static Sweep Engine (AM/FM Fruscio Reale Modulato)
+  // ──────────────────────────────────────────────────────────────────
+  private func startRadioStatic() {
+    guard !isStaticPlaying else { return }
+    isStaticPlaying = true
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      guard let self = self else { return }
+      let sr = 22050.0
+      let durationSeconds = 3.0
+      let n = Int(sr * durationSeconds)
+      var buf = [Int16]()
+      buf.reserveCapacity(n)
+
+      var lastNoise: Double = 0.0
+      for _ in 0..<n {
+        let white = Double.random(in: -1.0...1.0)
+        lastNoise = 0.65 * lastNoise + 0.35 * white
+        let radioNoise = lastNoise * 0.35
+        let sample = Int16(clamping: Int(radioNoise * Double(Int16.max)))
+        buf.append(sample)
+      }
+
+      let pcm = buf.withUnsafeBufferPointer { Data(buffer: $0) }
+      let wavData = self.buildWav(pcm: pcm, sampleRate: Int(sr))
+
+      DispatchQueue.main.async {
+        guard self.isStaticPlaying else { return }
+        do {
+          try? AVAudioSession.sharedInstance().setActive(true)
+          self.staticPlayer = try AVAudioPlayer(data: wavData)
+          self.staticPlayer?.numberOfLoops = -1
+          self.staticPlayer?.volume = 0.85
+          self.staticPlayer?.prepareToPlay()
+          let ok = self.staticPlayer?.play() ?? false
+          self.log("startRadioStatic -> play()=\(ok)")
+        } catch {
+          self.log("startRadioStatic errore: \(error.localizedDescription)")
+        }
+      }
+    }
+  }
+
+  private func stopRadioStatic() {
+    isStaticPlaying = false
+    DispatchQueue.main.async { [weak self] in
+      self?.staticPlayer?.stop()
+      self?.staticPlayer = nil
+      self?.log("stopRadioStatic -> fermato")
     }
   }
 
@@ -405,7 +475,8 @@ EMF baseline: \(String(format: "%.1f", emfBaseline)) uT
   // Beep / Chime / Alert suoni
   // ──────────────────────────────────────────────────────────────────
   private func playTone(hz: Int, ms: Int) {
-    DispatchQueue.global(qos: .userInitiated).async {
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      guard let self = self else { return }
       let sr  = 22050.0
       let n   = Int(sr * Double(ms) / 1000.0)
       var buf = [Int16]()
@@ -413,17 +484,21 @@ EMF baseline: \(String(format: "%.1f", emfBaseline)) uT
       for i in 0..<n {
         let angle = 2.0 * Double.pi * Double(i) * Double(hz) / sr
         let env   = 1.0 - Double(i) / Double(n)
-        buf.append(Int16(sin(angle) * Double(Int16.max) * 0.4 * env))
+        buf.append(Int16(sin(angle) * Double(Int16.max) * 0.45 * env))
       }
       let pcm = buf.withUnsafeBufferPointer { Data(buffer: $0) }
-      do {
-        let wavData = self.buildWav(pcm: pcm, sampleRate: Int(sr))
-        self.audioPlayer = try AVAudioPlayer(data: wavData)
-        self.audioPlayer?.prepareToPlay()
-        let ok = self.audioPlayer?.play() ?? false
-        self.log("playTone \(hz)Hz -> play()=\(ok)")
-      } catch {
-        self.log("playTone errore: \(error.localizedDescription)")
+      let wavData = self.buildWav(pcm: pcm, sampleRate: Int(sr))
+      DispatchQueue.main.async {
+        do {
+          try? AVAudioSession.sharedInstance().setActive(true)
+          self.audioPlayer = try AVAudioPlayer(data: wavData)
+          self.audioPlayer?.volume = 1.0
+          self.audioPlayer?.prepareToPlay()
+          let ok = self.audioPlayer?.play() ?? false
+          self.log("playTone \(hz)Hz -> play()=\(ok)")
+        } catch {
+          self.log("playTone errore: \(error.localizedDescription)")
+        }
       }
     }
   }

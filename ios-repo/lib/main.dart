@@ -36,7 +36,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.3 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2.4 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -295,6 +295,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       );
     } else if (res.isMechanicalTouch) {
       // Urto o contatto meccanico sul telaio senza anomalia EMF contemporanea
+      _playAlertBeep(520, 80); // Feedback acustico istantaneo di avvenuto impatto fisico
       _forensicLogger.logTrigger(
         res,
         pressureHpa: _currentPressure,
@@ -496,7 +497,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
             SizedBox(width: 8),
             Text(
-              'AETHERSCAN-PRO v27-beta2.3',
+              'AETHERSCAN-PRO v27-beta2.4',
               style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ],
@@ -531,16 +532,16 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Specifiche Release v27-beta2.3 (Build 2.0.27+5):',
+              'Specifiche Release v27-beta2.4 (Build 2.0.27+6):',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
             ),
             const SizedBox(height: 6),
             const Text(
-              '• Controllo Manuale: sia AM/FM Sweep che Metrology Pro partono spenti e vengono attivati a comando dall\'operatore.\n'
-              '• Radio Sweep Deterministica: DSP audio e fruscio radio modulato in streaming reattivo ai sensori.\n'
+              '• Motore Audio Sweep Reale: streaming continuo rumore radio AM/FM calibrato su speaker di sistema.\n'
+              '• Accelerometro Reale iOS: campionamento continuo urti in m/s² con feedback acustico immediato.\n'
+              '• Aggiornamento Diretto Senza Cavo: download pacchetto IPA/APK con un tocco da Safari/AltStore.\n'
               '• Esportazione Forense Diretta: file CSV RFC 4180 e JSON salvati su disco con Share Sheet nativo.\n'
-              '• Blocco Doppio Trigger: coincidenza simultanea tra urto (|A_dyn| >= 3.2 m/s²) e anomalia (Z >= 3.5σ).\n'
-              '• Calibrazione Welford 30s: baseline terrestre standard di default all\'avvio.',
+              '• Blocco Doppio Trigger: coincidenza simultanea tra urto (|A_dyn| >= 3.2 m/s²) e anomalia (Z >= 3.5σ).',
               style: TextStyle(fontSize: 10, color: IndustrialPalette.textMuted, height: 1.35),
             ),
             const SizedBox(height: 12),
@@ -602,19 +603,27 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         final data = jsonDecode(body) as Map<String, dynamic>;
         final latest = data['latest_version'] as String? ?? '';
         final notes = data['notes'] as String? ?? '';
+        final iosUrl = data['ios_download_url'] as String?;
+        final androidUrl = data['android_download_url'] as String?;
+        final defaultUrl = data['download_url'] as String? ?? 'https://github.com/squaloman74/AetherScan-Pro/releases/latest';
+
+        final targetDownload = Platform.isIOS
+            ? (iosUrl ?? defaultUrl)
+            : (androidUrl ?? defaultUrl);
 
         if (!mounted) return;
-        if (latest.isNotEmpty && latest != 'v27-beta2.3') {
+        if (latest.isNotEmpty && latest != 'v27-beta2.4') {
           _showUpdateResultDialog(
             isNewAvailable: true,
             version: latest,
             message: 'È disponibile una nuova versione:\n$notes',
+            downloadUrl: targetDownload,
           );
           return;
         } else {
           _showUpdateResultDialog(
             isNewAvailable: false,
-            version: latest.isNotEmpty ? latest : 'v27-beta2.3',
+            version: latest.isNotEmpty ? latest : 'v27-beta2.4',
             message: 'Sei all\'ultima versione disponibile. Tutti i moduli scientifici sono aggiornati.',
           );
           return;
@@ -623,11 +632,16 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     } catch (_) {}
 
     if (mounted) {
-      _showToast('Sei all\'ultima versione disponibile: v27-beta2.3');
+      _showToast('Sei all\'ultima versione disponibile: v27-beta2.4');
     }
   }
 
-  void _showUpdateResultDialog({required bool isNewAvailable, required String version, required String message}) {
+  void _showUpdateResultDialog({
+    required bool isNewAvailable,
+    required String version,
+    required String message,
+    String? downloadUrl,
+  }) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -673,9 +687,24 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ],
         ),
         actions: [
+          if (isNewAvailable && downloadUrl != null)
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: IndustrialPalette.phosphorGreen,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                try {
+                  _audioChannel.invokeMethod('openUrl', {'url': downloadUrl});
+                } catch (_) {}
+              },
+              icon: const Icon(Icons.download, size: 16),
+              label: const Text('SCARICA ORA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(color: IndustrialPalette.phosphorCyan)),
+            child: const Text('CHIUDI', style: TextStyle(color: IndustrialPalette.textMuted)),
           ),
         ],
       ),
@@ -754,7 +783,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.3 • SCIENTIFIC METROLOGY',
+                  'v27-beta2.4 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -865,7 +894,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ListTile(
             leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
             title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-            subtitle: const Text('v27-beta2.3 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            subtitle: const Text('v27-beta2.4 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
             onTap: () {
               Navigator.pop(context);
               _showVersionInfoDialog();
@@ -935,8 +964,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                   ),
                   Text(
                     _activeMode == AppOperatingMode.metrologyPro
-                        ? 'v27-beta2.3 • METROLOGY'
-                        : 'v27-beta2.3 • SWEEP',
+                        ? 'v27-beta2.4 • METROLOGY'
+                        : 'v27-beta2.4 • SWEEP',
                     style: TextStyle(
                       fontSize: 8,
                       color: _activeMode == AppOperatingMode.metrologyPro
