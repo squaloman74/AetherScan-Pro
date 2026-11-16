@@ -1,12 +1,12 @@
-# ◈ Guida all'Installazione: AetherScan-Pro v27-beta2
+# ◈ Guida all'Installazione: AetherScan-Pro v27-beta2.1 (Metrology Suite)
 
 Pacchetti ufficiali compilati per il rilascio e dispiegamento operativo sul campo.
-UI ottimizzata e snella con calibrazione concentrata unicamente nei punti essenziali.
+Architettura blindata: calibrazione Welford 30s su richiesta, doppio trigger rigoroso (3.5σ + 3.2 m/s²), audio AM/FM Spectral Sweep modulato in tempo reale e salvataggio nativo CSV/JSON con Share Sheet.
 
 ---
 
 ## 📱 1. Installazione Android (.APK)
-* **File:** `AetherScan-Pro-v27-beta2-Metrology.apk` (46.4 MB)
+* **File:** `AetherScan-Pro-v27-beta2-Metrology.apk` (47.2 MB)
 * **Compatibilità:** Android 8.0+ (Oreo, Pie, 10, 11, 12, 13, 14, 15+)
 * **Procedura di installazione diretta:**
   1. Trasferisci il file `.apk` sullo smartphone (tramite cavo USB, WhatsApp, Telegram, Google Drive o browser).
@@ -15,11 +15,12 @@ UI ottimizzata e snella con calibrazione concentrata unicamente nei punti essenz
   4. Conferma l'installazione e avvia AetherScan-Pro.
   5. **Interfaccia Pulita:** Nessun popup o banner invadente all'avvio. Lo strumento è subito operativo.
   6. **Calibrazione a Comando:** Quando desideri campionare la baseline ambientale, usa l'icona calibrazione nella barra in alto oppure il pulsante nel menu Drawer.
+  7. **Condivisione Forense:** Toccando "CSV RFC 4180" o "JSON FORENSE" si apre direttamente il foglio di condivisione nativo di Android (per salvare su file, inviare via email, WhatsApp, Drive, ecc.).
 
 ---
 
 ## 🍏 2. Installazione iOS (.IPA)
-* **File:** `AetherScan-Pro-v27-beta2-Metrology-unsigned.ipa` (8.89 MB)
+* **File:** `AetherScan-Pro-v27-beta2-Metrology-unsigned.ipa` (8.12 MB)
 * **Compatibilità:** iPhone iOS 14.0+ (inclusi iPhone 11, 12, 13, 14, 15, 16 Pro)
 * **Metodi di Sideloading consigliati:**
   * **Metodo A (Sideloadly - Consigliato da PC/Mac):**
@@ -37,10 +38,10 @@ UI ottimizzata e snella con calibrazione concentrata unicamente nei punti essenz
 ---
 
 ## 🔒 3. Verifica Integrità SHA-256
-Prima dell'installazione peritali o indagini ufficiali, puoi verificare l'impronta crittografica con il comando:
+Prima dell'installazione peritale o indagini ufficiali, puoi verificare l'impronta crittografica con il comando PowerShell:
 ```powershell
 Get-FileHash .\AetherScan-Pro-v27-beta2-Metrology.apk -Algorithm SHA256
 ```
-Impronte certificate ufficiali:
-* **APK (Android):** `6858AE65C28AAC51942BE31B4154CAFA4D23804531C7BDDCF9E379AB60D70CC5`
-* **IPA (iOS):** `5C309F2B35104E66080713B29EC9445EF9CC574378F656C6F44691969A42E050`
+Impronte certificate ufficiali v27-beta2.1:
+* **APK (Android):** `0CD5C81C1752EBD747DB27DDF5480B67BA534BC0919E936816D278B88D9F7393`
+* **IPA (iOS):** `FF44A523311C61142E84502755F01D8483BA8484E8CCF0BCDD6F0B3022EF535F`

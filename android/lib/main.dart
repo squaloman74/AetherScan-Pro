@@ -1,8 +1,12 @@
 ﻿import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'baseline_engine.dart';
 import 'trigger_logic.dart';
@@ -91,6 +95,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   AppOperatingMode _activeMode = AppOperatingMode.metrologyPro;
   late final SpectralSweepEngine _spectralSweepEngine;
   SweepFrame? _lastSweepFrame;
+  bool _isSweepAudioActive = false;
 
   @override
   void initState() {
@@ -171,6 +176,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
   @override
   void dispose() {
+    _stopSweepAudio();
     _baselineEngine.onCancelled = null;
     _baselineEngine.onProgress = null;
     _baselineEngine.onComplete = null;
@@ -243,9 +249,23 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       _emfOscilloscopeHistory.removeAt(0);
     }
 
+    _evaluateCurrentSensors();
+  }
+
+  void _handleAccelSample(double dynamicAccel) {
+    _currentDynamicVib = dynamicAccel;
+    if (_isCalibrating) {
+      _baselineEngine.ingestVibration(dynamicAccel, 0.0, 0.0);
+      return;
+    }
+
+    _evaluateCurrentSensors();
+  }
+
+  void _evaluateCurrentSensors() {
     final reading = SensorReading(
       timestamp: DateTime.now(),
-      emfMagnitude: magnitude,
+      emfMagnitude: _currentEmf,
       dynamicAcceleration: _currentDynamicVib,
       pressureHpa: _currentPressure,
     );
@@ -288,13 +308,6 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     }
   }
 
-  void _handleAccelSample(double dynamicAccel) {
-    _currentDynamicVib = dynamicAccel;
-    if (_isCalibrating) {
-      _baselineEngine.ingestVibration(dynamicAccel, 0.0, 0.0);
-    }
-  }
-
   void _handlePressureSample(double hPa) {
     _currentPressure = hPa;
     if (_isCalibrating) {
@@ -323,6 +336,19 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         );
         _lastSweepFrame = frame;
         buffer = frame.audioBuffer;
+
+        if (_isSweepAudioActive) {
+          try {
+            final double basePitch = _spectralSweepEngine.band == SweepBand.fm
+                ? 600.0 + ((_spectralSweepEngine.currentFrequency - 87.5) / (108.0 - 87.5)) * 1400.0
+                : 400.0 + ((_spectralSweepEngine.currentFrequency - 530.0) / (1600.0 - 530.0)) * 1200.0;
+            final double effectivePitch = (basePitch + (deltaEmf * 12.0)).clamp(200.0, 3000.0);
+            _audioChannel.invokeMethod('playModulatedStatic', {
+              'coupling': frame.sensorCouplingFactor,
+              'pitchHz': effectivePitch,
+            });
+          } catch (_) {}
+        }
       } else {
         // Generazione metrologica standard
         buffer = List<double>.generate(512, (i) {
@@ -348,6 +374,22 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   void _playAlertBeep(int freq, int durationMs) {
     try {
       _audioChannel.invokeMethod('playBeep', {'freq': freq, 'durationMs': durationMs});
+    } catch (_) {}
+  }
+
+  void _startSweepAudio() {
+    if (_isSweepAudioActive) return;
+    _isSweepAudioActive = true;
+    try {
+      _audioChannel.invokeMethod('startStatic');
+    } catch (_) {}
+  }
+
+  void _stopSweepAudio() {
+    if (!_isSweepAudioActive) return;
+    _isSweepAudioActive = false;
+    try {
+      _audioChannel.invokeMethod('stopStatic');
     } catch (_) {}
   }
 
@@ -436,16 +478,39 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
   }
 
-  void _exportCsvModal() {
+  Future<void> _exportCsvModal() async {
     final csv = _forensicLogger.exportCsv();
-    Clipboard.setData(ClipboardData(text: csv));
-    _showToast('Dataset CSV (${_forensicLogger.totalEntries} record) copiato negli appunti!');
+    try {
+      final dir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final file = File('${dir.path}/aetherscan_forensic_$timestamp.csv');
+      await file.writeAsString(csv, encoding: utf8);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/csv')],
+        subject: 'AetherScan-Pro — Log Forense CSV',
+      );
+    } catch (_) {
+      // Fallback: copia negli appunti
+      Clipboard.setData(ClipboardData(text: csv));
+      _showToast('CSV (${_forensicLogger.totalEntries} record) copiato negli appunti!');
+    }
   }
 
-  void _exportJsonModal() {
+  Future<void> _exportJsonModal() async {
     final jsonStr = _forensicLogger.exportJson();
-    Clipboard.setData(ClipboardData(text: jsonStr));
-    _showToast('Dataset JSON Forense copiato negli appunti!');
+    try {
+      final dir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final file = File('${dir.path}/aetherscan_forensic_$timestamp.json');
+      await file.writeAsString(jsonStr, encoding: utf8);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/json')],
+        subject: 'AetherScan-Pro — Log Forense JSON',
+      );
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: jsonStr));
+      _showToast('JSON Forense copiato negli appunti!');
+    }
   }
 
   Widget _buildDrawer(BuildContext context) {
@@ -532,6 +597,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             selected: _activeMode == AppOperatingMode.metrologyPro,
             selectedTileColor: IndustrialPalette.surfaceLight,
             onTap: () {
+              _stopSweepAudio();
               setState(() => _activeMode = AppOperatingMode.metrologyPro);
               Navigator.pop(context);
             },
@@ -550,6 +616,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             selected: _activeMode == AppOperatingMode.spectralSweep,
             selectedTileColor: IndustrialPalette.surfaceLight,
             onTap: () {
+              _startSweepAudio();
               setState(() => _activeMode = AppOperatingMode.spectralSweep);
               Navigator.pop(context);
             },
@@ -722,7 +789,17 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               onBandChanged: (b) => setState(() => _spectralSweepEngine.setBand(b)),
               onIntervalChanged: (ms) => setState(() => _spectralSweepEngine.setSweepInterval(ms)),
               onDirectionChanged: (dir) => setState(() => _spectralSweepEngine.setDirection(dir)),
-              onTogglePause: () => setState(() => _spectralSweepEngine.setPaused(_spectralSweepEngine.direction != SweepDirection.paused)),
+              onTogglePause: () {
+                setState(() {
+                  final willBePaused = _spectralSweepEngine.direction != SweepDirection.paused;
+                  _spectralSweepEngine.setPaused(willBePaused);
+                  if (willBePaused) {
+                    _stopSweepAudio();
+                  } else {
+                    _startSweepAudio();
+                  }
+                });
+              },
             ),
 
           // Overlay di Calibrazione 30 Secondi

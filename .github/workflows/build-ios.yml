@@ -1,4 +1,4 @@
-name: Build AetherScan Pro iOS (IPA) - v27-beta2 Metrology
+name: Build AetherScan Pro iOS (IPA) - v27-beta2.1 Metrology
 
 on:
   push:
@@ -49,20 +49,20 @@ jobs:
           name: AetherScan-Pro-v27-beta2-iOS-IPA
           path: ios-repo/release-ios/*.ipa
 
-      - name: Create GitHub Release with v27-beta2 IPA
+      - name: Create GitHub Release with v27-beta2.1 IPA
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v27-beta2
-          name: "AetherScan Pro v27-beta2 Metrology - iOS (IPA Unsigned)"
+          tag_name: v27-beta2.1
+          name: "AetherScan Pro v27-beta2.1 Metrology - iOS (IPA Unsigned)"
           body: |
-            ## AetherScan Pro v2.0 (v27-beta2) — Release Ufficiale iOS
-            **Data build:** 15/11/2026
+            ## AetherScan Pro v2.0 (v27-beta2.1) — Release Ufficiale iOS
+            **Data build:** 16/11/2026
             
             ### Novità e Specifiche Metrologiche:
-            - ✅ **Plancia Metrology Pro**: Grafici scientifici puri, Z-Score ≥ 3.5σ, log RFC 4180 CSV con SHA-256.
+            - ✅ **Plancia Metrology Pro**: Grafici scientifici puri, Z-Score ≥ 3.5σ, log RFC 4180 CSV con SHA-256 e condivisione file nativa.
             - ✅ **Doppio Trigger Concomitante Obbligatorio**: Allarme acustico subordinato alla coincidenza simultanea tra urto fisico (|A_dyn| ≥ 3.2 m/s²) e anomalia metrologica (Z ≥ 3.5σ).
             - ✅ **Zero Dizionari o Sintesi Fasulla**: Nessun generatore casuale o parola preimpostata.
-            - ✅ **AM/FM Spectral Sweep**: Radio sweep reattiva ai sensori con tasti dedicati [ REV ◀ ] e [ FWD ▶ ].
+            - ✅ **AM/FM Spectral Sweep**: Radio sweep reattiva ai sensori con fruscio statico modulato in tempo reale.
             - ✅ **Calibrazione Welford 30s**: A richiesta dell'operatore, baseline terrestre standard di default all'avvio.
           files: ios-repo/release-ios/*.ipa
           draft: false

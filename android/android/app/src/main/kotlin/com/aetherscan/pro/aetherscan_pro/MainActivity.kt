@@ -14,32 +14,27 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.speech.tts.TextToSpeech
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
-import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener, SensorEventListener {
+class MainActivity : FlutterActivity(), SensorEventListener {
     private val CHANNEL        = "com.aetherscan.pro/audio"
     private val SENSOR_CHANNEL = "com.aetherscan.pro/sensors"
     private val PREFS_NAME     = "AetherScanProPrefs"
     private val PREF_KEY_LICENSE = "saved_license_key"
 
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
     private var staticTrack: AudioTrack? = null
     private var isStaticPlaying = false
-    private var pendingSpeechText: String? = null
-    private var pendingSpeechVolume: Float = 1.0f
-    private var pendingSpeechGender: String = "female"
+    private var staticCoupling: Float = 0.0f
+    private var staticPitchHz: Float = 600.0f
     private var creepyMediaPlayer: MediaPlayer? = null
 
     // Sensori
@@ -62,8 +57,6 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener, SensorEvent
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        tts = TextToSpeech(this, this)
-
         // ── MethodChannel ──
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -84,11 +77,10 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener, SensorEvent
                         .edit().putString(PREF_KEY_LICENSE, keyToSave).apply()
                     result.success(true)
                 }
-                "speak" -> {
-                    val text = call.argument<String>("text") ?: ""
-                    val volume = call.argument<Double>("volume") ?: 1.0
-                    val gender = call.argument<String>("gender") ?: "female"
-                    speakText(text, volume.toFloat(), gender)
+                "playModulatedStatic" -> {
+                    val coupling = call.argument<Double>("coupling") ?: 0.0
+                    val pitchHz = call.argument<Double>("pitchHz") ?: 600.0
+                    updateStaticModulation(coupling.toFloat(), pitchHz.toFloat())
                     result.success(true)
                 }
                 "playBeep" -> {
@@ -161,13 +153,11 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener, SensorEvent
 === DIAGNOSTICA AETHERSCAN (ANDROID) ===
 Channel registrato: true
 Volume Stream Music: $currentVol / $maxVol
-TTS Ready: $ttsReady
-TTS Lingua: ${tts?.language?.displayName ?: "N/D"}
 Licenza salvata: ${if (savedKey.isEmpty()) "NO" else "SI (${savedKey.length} chars)"}
 Prossimita: ${if (proximitySensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
 Magnetometro (EMF): ${if (magSensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
 Sensore Tocco (Accel): ${if (accelSensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
-EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(Locale.US, "%.1f", emfBaseline)} uT
+EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.US, "%.1f", emfBaseline)} uT
 """.trimIndent()
     }
 
@@ -292,51 +282,6 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(Locale.US, "%.1f"
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     // ──────────────────────────────────────────────────────────────────
-    // TTS
-    // ──────────────────────────────────────────────────────────────────
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            val res = tts?.setLanguage(Locale.ITALIAN)
-            if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.setLanguage(Locale.getDefault())
-            }
-            tts?.setSpeechRate(0.85f)
-            tts?.setPitch(0.95f)
-            ttsReady = true
-            pendingSpeechText?.let { speakText(it, pendingSpeechVolume, pendingSpeechGender) }
-            pendingSpeechText = null
-        }
-    }
-
-    private fun speakText(text: String, volume: Float, gender: String = "female") {
-        if (ttsReady && tts != null) {
-            val pitch = if (gender == "male") 0.80f else 1.10f
-            tts?.setPitch(pitch)
-            try {
-                val voices = tts?.voices
-                if (voices != null) {
-                    val matchingVoice = voices.firstOrNull { voice ->
-                        voice.locale.language == "it" && 
-                        ((gender == "male" && (voice.name.contains("male", ignoreCase = true) || voice.name.contains("masc", ignoreCase = true))) ||
-                         (gender == "female" && (voice.name.contains("female", ignoreCase = true) || voice.name.contains("femm", ignoreCase = true))))
-                    } ?: voices.firstOrNull { it.locale.language == "it" }
-                    if (matchingVoice != null) {
-                        tts?.voice = matchingVoice
-                    }
-                }
-            } catch (_: Exception) {}
-
-            val params = Bundle()
-            params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "EVP_ID_" + System.currentTimeMillis())
-        } else {
-            pendingSpeechText = text
-            pendingSpeechVolume = volume
-            pendingSpeechGender = gender
-        }
-    }
-
-    // ──────────────────────────────────────────────────────────────────
     // Riproduzione Suono Risata Inquietante (Creepy Laugh)
     // ──────────────────────────────────────────────────────────────────
     private fun playCreepyLaughSound() {
@@ -426,19 +371,39 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(Locale.US, "%.1f"
         isStaticPlaying = true
         thread {
             try {
-                val sampleRate = 16000
+                val sampleRate = 22050
                 val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                val buffer = ShortArray(minBuf)
-                val random = Random(System.currentTimeMillis())
-                staticTrack = AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
-                    AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf, AudioTrack.MODE_STREAM)
+                val bufSize = maxOf(minBuf, 2048)
+                val buffer = ShortArray(bufSize)
+                staticTrack = AudioTrack(
+                    AudioManager.STREAM_MUSIC, sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                    bufSize, AudioTrack.MODE_STREAM
+                )
                 staticTrack?.play()
+                var phase = 0.0
+                val random = Random(System.currentTimeMillis())
                 while (isStaticPlaying) {
-                    for (i in buffer.indices) buffer[i] = random.nextInt(-2000, 2000).toShort()
+                    val coupling = staticCoupling.toDouble()
+                    val pitchHz = staticPitchHz.toDouble().coerceIn(200.0, 2000.0)
+                    val noiseAmp = (1.0 - coupling * 0.6).coerceIn(0.1, 1.0)
+                    val toneAmp = coupling * 0.4
+                    for (i in buffer.indices) {
+                        val noise = (random.nextDouble() * 2.0 - 1.0) * noiseAmp * 3000.0
+                        val tone = kotlin.math.sin(2.0 * Math.PI * pitchHz * phase) * toneAmp * 8000.0
+                        phase += 1.0 / sampleRate
+                        if (phase > 1.0) phase -= 1.0
+                        buffer[i] = (noise + tone).toInt().coerceIn(-32767, 32767).toShort()
+                    }
                     staticTrack?.write(buffer, 0, buffer.size)
                 }
             } catch (e: Exception) { e.printStackTrace() }
         }
+    }
+
+    private fun updateStaticModulation(coupling: Float, pitchHz: Float) {
+        staticCoupling = coupling
+        staticPitchHz = pitchHz
     }
 
     private fun stopRadioStatic() {
@@ -450,8 +415,6 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(Locale.US, "%.1f"
     override fun onDestroy() {
         stopSensors()
         stopRadioStatic()
-        tts?.stop()
-        tts?.shutdown()
         creepyMediaPlayer?.release()
         creepyMediaPlayer = null
         super.onDestroy()

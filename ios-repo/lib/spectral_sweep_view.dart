@@ -212,7 +212,7 @@ class SpectralSweepView extends StatelessWidget {
                   child: Row(
                     children: [
                       const Text(
-                        'ANALISI SPETTRALE DSP • MICROFONO / AMBIENTE',
+                        'ANALISI SPETTRALE DSP • SENSORI FISICI REALI',
                         style: TextStyle(
                           fontSize: 9.5,
                           fontWeight: FontWeight.bold,

@@ -72,5 +72,7 @@
 	</array>
 	<key>NSMotionUsageDescription</key>
 	<string>AetherScan Pro usa il magnetometro per rilevare anomalie del campo elettromagnetico (sensore EVP/EMF).</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>AetherScan Pro usa il microfono per l'analisi spettrale DSP in tempo reale del segnale ambientale nella modalità AM/FM Spectral Sweep.</string>
 </dict>
 </plist>
