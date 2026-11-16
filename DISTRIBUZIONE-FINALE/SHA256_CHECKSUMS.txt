@@ -4,15 +4,20 @@
 =============================================================
 
 [ANDROID APK — v27-beta2.1]
-File   : AetherScan-Pro-v27-beta2-Metrology.apk
-Size   : 49,530,672 bytes (47.2 MB)
-SHA-256: 0CD5C81C1752EBD747DB27DDF5480B67BA534BC0919E936816D278B88D9F7393
-Novità : Motore audio statico modulato in tempo reale (AM/FM Sweep),
-         esportazione su file CSV/JSON con share_plus, stream accelerometro
-         istantaneo per dual-trigger, pulizia codice TTS residuo.
+File   : AetherScan-Pro-v27-beta2.1-Metrology.apk
+Mirror : AetherScan-Pro-v27-beta2-Metrology.apk
+Size   : 49,530,676 bytes (47.2 MB)
+SHA-256: 0E1E860F126AF65C24A40B65AF50578537938825C7EC68FC3E3803DC3140FBEB
+Novità : 
+ - UI Banner & Header: aggiornati esplicitamente a 'v27-beta2.1'
+ - Audio Reale AM/FM: rumore radio e modulazione eterodina via AudioTrack
+ - Condivisione Forense Nativa: share_plus + path_provider per CSV/JSON
+ - Stream Accelerometro Istantaneo: campionamento continuo reattivo per dual-trigger
+ - Rimozione totale codice TTS/speak
 
 [iOS IPA unsigned — v27-beta2.1]
-File   : AetherScan-Pro-v27-beta2-Metrology-unsigned.ipa
+File   : AetherScan-Pro-v27-beta2.1-Metrology-unsigned.ipa
+Mirror : AetherScan-Pro-v27-beta2-Metrology-unsigned.ipa
 Size   : 8,515,595 bytes (8.12 MB)
 SHA-256: FF44A523311C61142E84502755F01D8483BA8484E8CCF0BCDD6F0B3022EF535F
 Bundle : com.aetherscan.pro.aetherscanPro
