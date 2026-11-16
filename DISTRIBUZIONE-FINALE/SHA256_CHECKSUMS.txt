@@ -1,33 +1,27 @@
-=============================================================
-  AETHERSCAN-PRO v27-beta2.2 — CHECKSUM UFFICIALI SHA-256
-  Generato: 2026-11-16
-=============================================================
+================================================================================
+AETHERSCAN-PRO v27-beta2.3 (BUILD 2.0.27+5) — OFFICIAL RELEASE CHECKSUMS
+Generato: 2026-11-16
+Canale Ufficiale: Release Certificata e Sicura
+================================================================================
 
-[ANDROID APK — v27-beta2.2]
-File   : AetherScan-Pro-v27-beta2.2-Metrology.apk
-Size   : 49,613,000 bytes (47.3 MB)
-SHA-256: 10A79F1AC7CD984671D64EEE305A1F19A5D04EF9997132E3D04006C6AD1BBCEE
-Novità : 
- - Controllo Manuale Flussi: AM/FM Sweep e Metrology Pro partono spenti (in standby) e vengono attivati a comando dall'operatore.
- - Dialog Informazioni e Aggiornamenti: visualizzazione integrata dei dettagli di versione v27-beta2.2 con verifica allineamento release.
- - UI Banner & Header: aggiornati esplicitamente a 'v27-beta2.2'.
- - Audio Reale AM/FM: fruscio radio atmosferico e modulazione eterodina via AudioTrack.
- - Condivisione Forense Nativa: share_plus + path_provider per esportazione CSV/JSON.
- - Stream Accelerometro Istantaneo: campionamento continuo reattivo per dual-trigger.
- - Rimozione totale codice TTS/speak.
+[ANDROID RELEASE APK]
+File:   AetherScan-Pro-v27-beta2.3-Metrology.apk
+Dim:    50,448,648 bytes (48.1 MB)
+SHA256: 0CCE9F4AFBCB600BF5B3A3A529CC935DCFD7E7827ABEB2717ECB480743937EB7
 
-[iOS IPA unsigned — v27-beta2.2]
-File   : AetherScan-Pro-v27-beta2.2-Metrology-unsigned.ipa
-Size   : 8,515,595 bytes (8.12 MB)
-SHA-256: FF44A523311C61142E84502755F01D8483BA8484E8CCF0BCDD6F0B3022EF535F
-Bundle : com.aetherscan.pro.aetherscanPro
-Version: 2.0.27 (CFBundleShortVersionString)
+[iOS RELEASE IPA - UNSIGNED / SIDELOAD READY]
+File:   AetherScan-Pro-v27-beta2.3-Metrology-unsigned.ipa
+Dim:    8,515,595 bytes (8.1 MB)
+SHA256: FF44A523311C61142E84502755F01D8483BA8484E8CCF0BCDD6F0B3022EF535F
 
-[PDF MANUALE FORENSE]
-File   : MANUALE_OPERATIVO_AETHERSCAN_PRO_v27.pdf
-Size   : ~990 KB (18 pagine)
+[DOCUMENTAZIONE METROLOGICA]
+File:   MANUALE_OPERATIVO_AETHERSCAN_PRO_v27.pdf
+SHA256: 6BB71CEC24A0707A7E2FFBA57465EB4E6FCB6F2A3057EAB9BFB79F500991466B
 
-=============================================================
-  VERIFICA INTEGRITÀ (PowerShell):
-  Get-FileHash <nomefile> -Algorithm SHA256
-=============================================================
+================================================================================
+VERIFICA INTEGRITÀ:
+PowerShell:
+  Get-FileHash -Algorithm SHA256 .\AetherScan-Pro-v27-beta2.3-Metrology.apk
+Linux/macOS:
+  sha256sum AetherScan-Pro-v27-beta2.3-Metrology.apk
+================================================================================

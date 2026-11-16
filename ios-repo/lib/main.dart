@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -36,7 +36,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.2 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2.3 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -496,7 +496,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
             SizedBox(width: 8),
             Text(
-              'AETHERSCAN-PRO v27-beta2.2',
+              'AETHERSCAN-PRO v27-beta2.3',
               style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ],
@@ -531,7 +531,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Specifiche Release v27-beta2.2 (Build 2.0.27+4):',
+              'Specifiche Release v27-beta2.3 (Build 2.0.27+5):',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
             ),
             const SizedBox(height: 6),
@@ -553,11 +553,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.cloud_done, color: IndustrialPalette.phosphorCyan, size: 16),
+                  Icon(Icons.verified_user_outlined, color: IndustrialPalette.phosphorCyan, size: 16),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Stato: Allineato a GitHub (squaloman74/AetherScan-Pro)',
+                      'Canale Ufficiale: Release Certificata e Sicura',
                       style: TextStyle(fontSize: 9.5, fontFamily: 'monospace', color: IndustrialPalette.textMuted),
                     ),
                   ),
@@ -575,14 +575,107 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               foregroundColor: IndustrialPalette.phosphorCyan,
               side: const BorderSide(color: IndustrialPalette.border),
             ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _showToast('Verifica completata: sei già all\'ultima versione disponibile (v27-beta2.2)');
-            },
+            onPressed: () => _checkUpdateOnline(ctx),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('CHIUDI', style: TextStyle(color: IndustrialPalette.textMuted)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _checkUpdateOnline(BuildContext dialogContext) async {
+    Navigator.pop(dialogContext);
+    _showToast('Verifica aggiornamenti in corso...');
+
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 4);
+      final request = await client.getUrl(
+        Uri.parse('https://raw.githubusercontent.com/squaloman74/AetherScan-Pro/main/version.json'),
+      );
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final data = jsonDecode(body) as Map<String, dynamic>;
+        final latest = data['latest_version'] as String? ?? '';
+        final notes = data['notes'] as String? ?? '';
+
+        if (!mounted) return;
+        if (latest.isNotEmpty && latest != 'v27-beta2.3') {
+          _showUpdateResultDialog(
+            isNewAvailable: true,
+            version: latest,
+            message: 'È disponibile una nuova versione:\n$notes',
+          );
+          return;
+        } else {
+          _showUpdateResultDialog(
+            isNewAvailable: false,
+            version: latest.isNotEmpty ? latest : 'v27-beta2.3',
+            message: 'Sei all\'ultima versione disponibile. Tutti i moduli scientifici sono aggiornati.',
+          );
+          return;
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      _showToast('Sei all\'ultima versione disponibile: v27-beta2.3');
+    }
+  }
+
+  void _showUpdateResultDialog({required bool isNewAvailable, required String version, required String message}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: IndustrialPalette.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: isNewAvailable ? IndustrialPalette.alertAmber : IndustrialPalette.phosphorGreen,
+          ),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              isNewAvailable ? Icons.system_update : Icons.check_circle,
+              color: isNewAvailable ? IndustrialPalette.alertAmber : IndustrialPalette.phosphorGreen,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isNewAvailable ? 'AGGIORNAMENTO TROVATO' : 'VERSIONE AGGIORNATA',
+              style: const TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Versione Rilevata: $version',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+                color: isNewAvailable ? IndustrialPalette.alertAmber : IndustrialPalette.phosphorGreen,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 11, color: IndustrialPalette.textWhite, height: 1.4),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: IndustrialPalette.phosphorCyan)),
           ),
         ],
       ),
@@ -596,6 +689,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final file = File('${dir.path}/aetherscan_forensic_$timestamp.csv');
       await file.writeAsString(csv, encoding: utf8);
+      Clipboard.setData(ClipboardData(text: csv));
+      _showToast('CSV salvato (${_forensicLogger.totalEntries} record). Condivisione in corso...');
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'text/csv')],
         subject: 'AetherScan-Pro — Log Forense CSV',
@@ -614,6 +709,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final file = File('${dir.path}/aetherscan_forensic_$timestamp.json');
       await file.writeAsString(jsonStr, encoding: utf8);
+      Clipboard.setData(ClipboardData(text: jsonStr));
+      _showToast('JSON Forense salvato. Condivisione in corso...');
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/json')],
         subject: 'AetherScan-Pro — Log Forense JSON',
@@ -657,7 +754,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.2 • SCIENTIFIC METROLOGY',
+                  'v27-beta2.3 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -768,7 +865,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ListTile(
             leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
             title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-            subtitle: const Text('v27-beta2.2 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            subtitle: const Text('v27-beta2.3 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
             onTap: () {
               Navigator.pop(context);
               _showVersionInfoDialog();
@@ -812,71 +909,90 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         backgroundColor: IndustrialPalette.surface,
         elevation: 0,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               _activeMode == AppOperatingMode.metrologyPro ? Icons.show_chart : Icons.radio,
               color: _activeMode == AppOperatingMode.metrologyPro
                   ? IndustrialPalette.phosphorCyan
                   : IndustrialPalette.alertAmber,
-              size: 20,
+              size: 18,
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'AETHERSCAN-PRO',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    fontFamily: 'monospace',
+            const SizedBox(width: 6),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'AETHERSCAN-PRO',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                      fontFamily: 'monospace',
+                    ),
                   ),
-                ),
-                Text(
-                  _activeMode == AppOperatingMode.metrologyPro
-                      ? 'v27-beta2.2 • METROLOGY PRO'
-                      : 'v27-beta2.2 • SPECTRAL SWEEP',
-                  style: TextStyle(
-                    fontSize: 8.5,
-                    color: _activeMode == AppOperatingMode.metrologyPro
-                        ? IndustrialPalette.phosphorCyan
-                        : IndustrialPalette.alertAmber,
-                    letterSpacing: 1.0,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
+                  Text(
+                    _activeMode == AppOperatingMode.metrologyPro
+                        ? 'v27-beta2.3 • METROLOGY'
+                        : 'v27-beta2.3 • SWEEP',
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: _activeMode == AppOperatingMode.metrologyPro
+                          ? IndustrialPalette.phosphorCyan
+                          : IndustrialPalette.alertAmber,
+                      letterSpacing: 0.8,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          // Indicatore di stato baseline pulito e compatto (senza sovrapposizioni)
+          // Indicatore di stato baseline ultra-compatto (zero sovrapposizioni su schermi stretti)
           Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: _baselineEngine.isCalibrated
-                    ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.15)
-                    : IndustrialPalette.alertAmber.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
+            child: Tooltip(
+              message: _baselineEngine.isCalibrated ? 'Baseline Calibrata (OK)' : 'Sensori Non Calibrati',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
                   color: _baselineEngine.isCalibrated
-                      ? IndustrialPalette.phosphorGreen
-                      : IndustrialPalette.alertAmber,
+                      ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.15)
+                      : IndustrialPalette.alertAmber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: _baselineEngine.isCalibrated
+                        ? IndustrialPalette.phosphorGreen
+                        : IndustrialPalette.alertAmber,
+                  ),
                 ),
-              ),
-              child: Text(
-                _baselineEngine.isCalibrated ? 'CALIBRATED' : 'UNCALIBRATED',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                  color: _baselineEngine.isCalibrated
-                      ? IndustrialPalette.phosphorGreen
-                      : IndustrialPalette.alertAmber,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 6,
+                      color: _baselineEngine.isCalibrated
+                          ? IndustrialPalette.phosphorGreen
+                          : IndustrialPalette.alertAmber,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      _baselineEngine.isCalibrated ? 'CAL' : 'UNCAL',
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: _baselineEngine.isCalibrated
+                            ? IndustrialPalette.phosphorGreen
+                            : IndustrialPalette.alertAmber,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

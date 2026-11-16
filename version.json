@@ -1,0 +1,8 @@
+{
+  "latest_version": "v27-beta2.3",
+  "build_number": 275,
+  "release_date": "2026-11-16",
+  "release_title": "AetherScan-Pro v27-beta2.3 Metrology Suite",
+  "notes": "Risolto overlap interfaccia plancia, export forense CSV/JSON diretto con Share Sheet, controllo manuale flussi, verifica aggiornamenti live.",
+  "download_url": "https://github.com/squaloman74/AetherScan-Pro/releases"
+}
