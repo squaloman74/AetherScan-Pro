@@ -1,21 +1,23 @@
 =============================================================
-  AETHERSCAN-PRO v27-beta2.1 — CHECKSUM UFFICIALI SHA-256
+  AETHERSCAN-PRO v27-beta2.2 — CHECKSUM UFFICIALI SHA-256
   Generato: 2026-11-16
 =============================================================
 
-[ANDROID APK — v27-beta2.1]
-File   : AetherScan-Pro-v27-beta2.1-Metrology.apk
-Size   : 49,530,676 bytes (47.2 MB)
-SHA-256: 0E1E860F126AF65C24A40B65AF50578537938825C7EC68FC3E3803DC3140FBEB
+[ANDROID APK — v27-beta2.2]
+File   : AetherScan-Pro-v27-beta2.2-Metrology.apk
+Size   : 49,613,000 bytes (47.3 MB)
+SHA-256: 10A79F1AC7CD984671D64EEE305A1F19A5D04EF9997132E3D04006C6AD1BBCEE
 Novità : 
- - UI Banner & Header: aggiornati esplicitamente a 'v27-beta2.1'
- - Audio Reale AM/FM: rumore radio e modulazione eterodina via AudioTrack
- - Condivisione Forense Nativa: share_plus + path_provider per CSV/JSON
- - Stream Accelerometro Istantaneo: campionamento continuo reattivo per dual-trigger
- - Rimozione totale codice TTS/speak
+ - Controllo Manuale Flussi: AM/FM Sweep e Metrology Pro partono spenti (in standby) e vengono attivati a comando dall'operatore.
+ - Dialog Informazioni e Aggiornamenti: visualizzazione integrata dei dettagli di versione v27-beta2.2 con verifica allineamento release.
+ - UI Banner & Header: aggiornati esplicitamente a 'v27-beta2.2'.
+ - Audio Reale AM/FM: fruscio radio atmosferico e modulazione eterodina via AudioTrack.
+ - Condivisione Forense Nativa: share_plus + path_provider per esportazione CSV/JSON.
+ - Stream Accelerometro Istantaneo: campionamento continuo reattivo per dual-trigger.
+ - Rimozione totale codice TTS/speak.
 
-[iOS IPA unsigned — v27-beta2.1]
-File   : AetherScan-Pro-v27-beta2.1-Metrology-unsigned.ipa
+[iOS IPA unsigned — v27-beta2.2]
+File   : AetherScan-Pro-v27-beta2.2-Metrology-unsigned.ipa
 Size   : 8,515,595 bytes (8.12 MB)
 SHA-256: FF44A523311C61142E84502755F01D8483BA8484E8CCF0BCDD6F0B3022EF535F
 Bundle : com.aetherscan.pro.aetherscanPro

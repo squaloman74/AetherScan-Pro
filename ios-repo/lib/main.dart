@@ -36,7 +36,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.1 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2.2 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -96,6 +96,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   late final SpectralSweepEngine _spectralSweepEngine;
   SweepFrame? _lastSweepFrame;
   bool _isSweepAudioActive = false;
+  bool _isMetrologyMonitoringActive = false; // Spento di default, attivato a comando dall'utente
 
   @override
   void initState() {
@@ -162,6 +163,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     _spectralSweepEngine = SpectralSweepEngine(
       sampleRate: 48000.0,
       band: SweepBand.fm,
+      direction: SweepDirection.paused, // Spento di default, attivato a comando dall'utente
       sweepIntervalMs: 100,
     );
 
@@ -263,6 +265,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   }
 
   void _evaluateCurrentSensors() {
+    if (_isCalibrating || !_isMetrologyMonitoringActive) return;
+
     final reading = SensorReading(
       timestamp: DateTime.now(),
       emfMagnitude: _currentEmf,
@@ -478,6 +482,113 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
   }
 
+  void _showVersionInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: IndustrialPalette.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: IndustrialPalette.phosphorCyan),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'AETHERSCAN-PRO v27-beta2.2',
+              style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: IndustrialPalette.phosphorGreen.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: IndustrialPalette.phosphorGreen),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: IndustrialPalette.phosphorGreen, size: 14),
+                  SizedBox(width: 6),
+                  Text(
+                    'VERSIONE PIÙ AGGIORNATA INSTALLATA',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      color: IndustrialPalette.phosphorGreen,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Specifiche Release v27-beta2.2 (Build 2.0.27+4):',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '• Controllo Manuale: sia AM/FM Sweep che Metrology Pro partono spenti e vengono attivati a comando dall\'operatore.\n'
+              '• Radio Sweep Deterministica: DSP audio e fruscio radio modulato in streaming reattivo ai sensori.\n'
+              '• Esportazione Forense Diretta: file CSV RFC 4180 e JSON salvati su disco con Share Sheet nativo.\n'
+              '• Blocco Doppio Trigger: coincidenza simultanea tra urto (|A_dyn| >= 3.2 m/s²) e anomalia (Z >= 3.5σ).\n'
+              '• Calibrazione Welford 30s: baseline terrestre standard di default all\'avvio.',
+              style: TextStyle(fontSize: 10, color: IndustrialPalette.textMuted, height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: IndustrialPalette.background,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: IndustrialPalette.border),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.cloud_done, color: IndustrialPalette.phosphorCyan, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Stato: Allineato a GitHub (squaloman74/AetherScan-Pro)',
+                      style: TextStyle(fontSize: 9.5, fontFamily: 'monospace', color: IndustrialPalette.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.sync, size: 14),
+            label: const Text('VERIFICA AGGIORNAMENTI', style: TextStyle(fontSize: 10, fontFamily: 'monospace')),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: IndustrialPalette.surfaceLight,
+              foregroundColor: IndustrialPalette.phosphorCyan,
+              side: const BorderSide(color: IndustrialPalette.border),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _showToast('Verifica completata: sei già all\'ultima versione disponibile (v27-beta2.2)');
+            },
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CHIUDI', style: TextStyle(color: IndustrialPalette.textMuted)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _exportCsvModal() async {
     final csv = _forensicLogger.exportCsv();
     try {
@@ -546,7 +657,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.1 • SCIENTIFIC METROLOGY',
+                  'v27-beta2.2 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -616,8 +727,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             selected: _activeMode == AppOperatingMode.spectralSweep,
             selectedTileColor: IndustrialPalette.surfaceLight,
             onTap: () {
-              _startSweepAudio();
-              setState(() => _activeMode = AppOperatingMode.spectralSweep);
+              _stopSweepAudio(); // Radio spenta all'accesso: l'utente preme AVVIA a comando
+              setState(() {
+                _activeMode = AppOperatingMode.spectralSweep;
+                _spectralSweepEngine.setPaused(true);
+              });
               Navigator.pop(context);
             },
           ),
@@ -649,6 +763,16 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 _startCalibration();
               },
             ),
+          ),
+          const Divider(color: IndustrialPalette.border),
+          ListTile(
+            leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
+            title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
+            subtitle: const Text('v27-beta2.2 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            onTap: () {
+              Navigator.pop(context);
+              _showVersionInfoDialog();
+            },
           ),
           const Spacer(),
           const Divider(color: IndustrialPalette.border),
@@ -712,8 +836,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 Text(
                   _activeMode == AppOperatingMode.metrologyPro
-                      ? 'v27-beta2.1 • METROLOGY PRO'
-                      : 'v27-beta2.1 • SPECTRAL SWEEP',
+                      ? 'v27-beta2.2 • METROLOGY PRO'
+                      : 'v27-beta2.2 • SPECTRAL SWEEP',
                   style: TextStyle(
                     fontSize: 8.5,
                     color: _activeMode == AppOperatingMode.metrologyPro
@@ -761,6 +885,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             icon: const Icon(Icons.tune, color: IndustrialPalette.alertAmber, size: 20),
             tooltip: 'Calibra Baseline (30s)',
             onPressed: _startCalibration,
+          ),
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 20),
+            tooltip: 'Verifica Aggiornamenti & Info',
+            onPressed: _showVersionInfoDialog,
           ),
           if (_activeMode == AppOperatingMode.metrologyPro)
             IconButton(
@@ -827,6 +956,75 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ── Barra Controllo Manuale Attivazione Metrology Pro ──
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: IndustrialPalette.surface,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _isMetrologyMonitoringActive
+                    ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.6)
+                    : IndustrialPalette.alertAmber.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isMetrologyMonitoringActive ? Icons.radio_button_checked : Icons.pause_circle_outline,
+                  color: _isMetrologyMonitoringActive ? IndustrialPalette.phosphorGreen : IndustrialPalette.alertAmber,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isMetrologyMonitoringActive ? 'METROLOGY PRO: ATTIVO' : 'METROLOGY PRO: SPENTO (STANDBY)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                          color: _isMetrologyMonitoringActive ? IndustrialPalette.phosphorGreen : IndustrialPalette.alertAmber,
+                        ),
+                      ),
+                      Text(
+                        _isMetrologyMonitoringActive ? 'Analisi continua sensori e allarme doppio trigger abilitati' : 'Tocca ATTIVA per avviare il monitoraggio forense',
+                        style: const TextStyle(fontSize: 8.5, color: IndustrialPalette.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  icon: Icon(_isMetrologyMonitoringActive ? Icons.pause : Icons.play_arrow, size: 14),
+                  label: Text(
+                    _isMetrologyMonitoringActive ? 'PAUSA' : 'ATTIVA',
+                    style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isMetrologyMonitoringActive ? IndustrialPalette.surfaceLight : IndustrialPalette.phosphorGreen,
+                    foregroundColor: _isMetrologyMonitoringActive ? IndustrialPalette.textWhite : Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isMetrologyMonitoringActive = !_isMetrologyMonitoringActive;
+                    });
+                    if (_isMetrologyMonitoringActive) {
+                      _showToast('Monitoraggio Metrology attivato!');
+                    } else {
+                      _showToast('Monitoraggio Metrology messo in pausa (Standby)');
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+
           // ── 1. Telemetry Cards Row ──
           Row(
             children: [
