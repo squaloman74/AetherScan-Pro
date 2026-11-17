@@ -1,28 +1,5 @@
-================================================================================
-AETHERSCAN-PRO v27-beta2.4 (BUILD 2.0.27+6) — OFFICIAL RELEASE CHECKSUMS
-Generato: 2026-11-16
-Canale Ufficiale: Release Certificata e Sicura
-================================================================================
-
-[ANDROID RELEASE APK]
-File:   AetherScan-Pro-v27-beta2.4-Metrology.apk
-Dim:    50,448,688 bytes (48.1 MB)
-SHA256: 6434801752E50491E8D9EB9A88096F4721222F3E9E2F6B58271C62B3456669BF
-
-[iOS RELEASE IPA - COMPILATO MAC XCODE / SIDELOAD READY]
-File:   AetherScan-Pro-v27-beta2.4-Metrology-unsigned.ipa
-Dim:    8,777,528 bytes (8.37 MB)
-Build:  GitHub Actions macOS Runner (Xcode + Flutter 3.x Native ARM64)
-SHA256: B96A7E57EEDBC2BD0316DFC703D2AC8EBFE38333E282DBAEC2597A04D8CA30AC
-
-[DOCUMENTAZIONE METROLOGICA]
-File:   MANUALE_OPERATIVO_AETHERSCAN_PRO_v27.pdf
-SHA256: 6BB71CEC24A0707A7E2FFBA57465EB4E6FCB6F2A3057EAB9BFB79F500991466B
-
-================================================================================
-VERIFICA INTEGRITÀ:
-PowerShell:
-  Get-FileHash -Algorithm SHA256 .\AetherScan-Pro-v27-beta2.4-Metrology-unsigned.ipa
-Linux/macOS:
-  sha256sum AetherScan-Pro-v27-beta2.4-Metrology-unsigned.ipa
-================================================================================
+# AetherScan-Pro v27-beta2.5 � SHA256 CHECKSUMS
+# Generato: 2026-11-17 14:15:45
+#
+F048CF06EA9C60756B7037B6535FFD84242BB8D33836CAC4BE5432DD180D55AD  AetherScan-Pro-v27-beta2.5-Metrology.apk
+IPA_SHA256_PENDING  AetherScan-Pro-v27-beta2.5-Metrology-unsigned.ipa (download dopo GitHub CI)

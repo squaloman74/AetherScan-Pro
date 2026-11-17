@@ -159,6 +159,23 @@ import CoreMotion
         self.stopRadioStatic()
         result(true)
 
+      case "updateStaticParams":
+        let args     = call.arguments as? [String: Any]
+        let dEmf     = args?["emfDelta"] as? Double ?? 0.0
+        let accel    = args?["accel"]    as? Double ?? 0.0
+        let zScore   = args?["zScore"]   as? Double ?? 0.0
+        let pitchHz  = args?["pitchHz"]  as? Double ?? 800.0
+        self.updateChaosParams(deltaEmf: dEmf, accel: accel, zScore: zScore, pitchHz: pitchHz)
+        result(true)
+
+      case "playModulatedStatic":
+        // Alias legacy — reindirizza a updateChaosParams
+        let args2    = call.arguments as? [String: Any]
+        let coupling = args2?["coupling"] as? Double ?? 0.0
+        let pitch2   = args2?["pitchHz"]  as? Double ?? 800.0
+        self.updateChaosParams(deltaEmf: 0.0, accel: coupling, zScore: 0.0, pitchHz: pitch2)
+        result(true)
+
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -315,41 +332,90 @@ import CoreMotion
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Radio Static Sweep Engine (AM/FM Fruscio Reale Modulato)
+  // Radio Static Sweep Engine — Motore Caotico DSP (Logistic Map + Biquad IIR)
+  // ZERO Double.random() — sintesi completamente deterministica basata sui sensori
   // ──────────────────────────────────────────────────────────────────
+  private var staticAudioEngine : AVAudioEngine?
+  private var staticSourceNode  : AVAudioSourceNode?
+
+  // Parametri chaos aggiornati dai sensori (double: atomic su armv8)
+  private var chaosDeltaEmf: Double = 0.0
+  private var chaosAccel: Double    = 0.0
+  private var chaosZScore: Double   = 0.0
+  private var chaosPitchHz: Double  = 800.0
+
   private func startRadioStatic() {
     guard !isStaticPlaying else { return }
     isStaticPlaying = true
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       guard let self = self else { return }
-      let sr = 22050.0
-      let durationSeconds = 3.0
-      let n = Int(sr * durationSeconds)
-      var buf = [Int16]()
-      buf.reserveCapacity(n)
+      let sampleRate = 22050.0
+      guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else { return }
 
-      var lastNoise: Double = 0.0
-      for _ in 0..<n {
-        let white = Double.random(in: -1.0...1.0)
-        lastNoise = 0.65 * lastNoise + 0.35 * white
-        let radioNoise = lastNoise * 0.35
-        let sample = Int16(clamping: Int(radioNoise * Double(Int16.max)))
-        buf.append(sample)
+      // Stato oscillatore e filtro — catturati nel closure del render callback
+      var logX: Double = 0.5
+      var phase: Double = 0.0
+      var tremoloPhase: Double = 0.0
+      let dt = 1.0 / sampleRate
+      var bqX1 = 0.0, bqX2 = 0.0, bqY1 = 0.0, bqY2 = 0.0
+      var bqB0 = 1.0, bqB2 = -1.0, bqA1 = 0.0, bqA2 = 0.0
+
+      func updateBiquad(_ cutHz: Double, _ q: Double) {
+        let omega = 2.0 * Double.pi * cutHz / sampleRate
+        let sinW = sin(omega), cosW = cos(omega)
+        let alpha = sinW / (2.0 * q)
+        let a0inv = 1.0 / (1.0 + alpha)
+        bqB0 =  alpha * a0inv;  bqB2 = -alpha * a0inv
+        bqA1 = -2.0 * cosW * a0inv;  bqA2 = (1.0 - alpha) * a0inv
       }
 
-      let pcm = buf.withUnsafeBufferPointer { Data(buffer: $0) }
-      let wavData = self.buildWav(pcm: pcm, sampleRate: Int(sr))
+      let sourceNode = AVAudioSourceNode(format: format) { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
+        guard let self = self else { return noErr }
+        let ablPtr = UnsafeMutableAudioBufferListPointer(audioBufferList)
+        let dEmf  = self.chaosDeltaEmf, accel = self.chaosAccel
+        let zScore = self.chaosZScore
+        let baseCarrierHz = max(200.0, min(2000.0, self.chaosPitchHz))
+        let rParam    = max(3.57, min(4.0, 3.72 + abs(dEmf) * 0.08))
+        let coupling  = max(0.0, min(1.0, abs(zScore) / 4.0 + accel / 3.0))
+        let emfShift  = dEmf * 120.0
+        let cutoffHz  = max(200.0, min(3000.0, 800.0 + abs(zScore) * 280.0))
+        let qFactor   = max(0.5, min(8.0, 1.0 + accel * 2.5))
+        updateBiquad(cutoffHz, qFactor)
+        let trRate    = max(0.5, min(6.0, 0.5 + abs(accel) * 2.5))
+        let trDepth   = max(0.15, min(0.6, 0.15 + coupling * 0.45))
+        for buffer in ablPtr {
+          let buf = buffer.mData!.assumingMemoryBound(to: Float.self)
+          for i in 0..<Int(frameCount) {
+            logX = rParam * logX * (1.0 - logX)
+            if logX.isNaN || logX.isInfinite { logX = 0.5 }
+            let chaosRaw = logX * 2.0 - 1.0
+            phase += (baseCarrierHz + emfShift) * dt
+            if phase > 1e6 { phase -= 1e6 }
+            let carrier = sin(2.0 * Double.pi * phase)
+            tremoloPhase += trRate * dt
+            if tremoloPhase > 1e6 { tremoloPhase -= 1e6 }
+            let tremolo = 1.0 - trDepth * (0.5 + 0.5 * sin(2.0 * Double.pi * tremoloPhase))
+            let mixed = (chaosRaw * (1.0 - coupling * 0.6) + carrier * coupling * 0.4) * tremolo
+            let filtered = bqB0 * mixed + bqB2 * bqX2 - bqA1 * bqY1 - bqA2 * bqY2
+            bqX2 = bqX1; bqX1 = mixed; bqY2 = bqY1; bqY1 = filtered
+            buf[i] = Float(max(-1.0, min(1.0, filtered * 0.75)))
+          }
+        }
+        return noErr
+      }
 
       DispatchQueue.main.async {
         guard self.isStaticPlaying else { return }
         do {
           try? AVAudioSession.sharedInstance().setActive(true)
-          self.staticPlayer = try AVAudioPlayer(data: wavData)
-          self.staticPlayer?.numberOfLoops = -1
-          self.staticPlayer?.volume = 0.85
-          self.staticPlayer?.prepareToPlay()
-          let ok = self.staticPlayer?.play() ?? false
-          self.log("startRadioStatic -> play()=\(ok)")
+          let engine = AVAudioEngine()
+          engine.attach(sourceNode)
+          engine.connect(sourceNode, to: engine.mainMixerNode, format: format)
+          engine.mainMixerNode.outputVolume = 0.85
+          try engine.start()
+          self.staticAudioEngine = engine
+          self.staticSourceNode  = sourceNode
+          self.log("startRadioStatic chaos -> engine avviato OK")
         } catch {
           self.log("startRadioStatic errore: \(error.localizedDescription)")
         }
@@ -360,10 +426,20 @@ import CoreMotion
   private func stopRadioStatic() {
     isStaticPlaying = false
     DispatchQueue.main.async { [weak self] in
+      self?.staticAudioEngine?.stop()
+      self?.staticAudioEngine = nil
+      self?.staticSourceNode  = nil
       self?.staticPlayer?.stop()
       self?.staticPlayer = nil
       self?.log("stopRadioStatic -> fermato")
     }
+  }
+
+  private func updateChaosParams(deltaEmf: Double, accel: Double, zScore: Double, pitchHz: Double) {
+    chaosDeltaEmf = deltaEmf
+    chaosAccel    = accel
+    chaosZScore   = zScore
+    chaosPitchHz  = pitchHz
   }
 
   // ──────────────────────────────────────────────────────────────────

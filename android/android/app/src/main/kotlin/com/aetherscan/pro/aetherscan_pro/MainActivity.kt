@@ -1,4 +1,4 @@
-package com.aetherscan.pro.aetherscan_pro
+﻿package com.aetherscan.pro.aetherscan_pro
 
 import android.content.Context
 import android.content.Intent
@@ -97,6 +97,13 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     result.success(true)
                 }
                 "startStatic" -> { startRadioStatic(); result.success(true) }
+                "updateStaticParams" -> {
+                    val dEmf   = call.argument<Double>("emfDelta") ?: 0.0
+                    val accel  = call.argument<Double>("accel") ?: 0.0
+                    val zScore = call.argument<Double>("zScore") ?: 0.0
+                    updateStaticChaosParams(dEmf, accel, zScore)
+                    result.success(true)
+                }
                 "stopStatic"  -> { stopRadioStatic(); result.success(true) }
                 "audioDiagnostic" -> {
                     result.success(buildDiagnostic())
@@ -366,13 +373,21 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
         }
     }
 
+    // == Parametri chaos DSP aggiornabili in tempo reale dai sensori ==
+    @Volatile private var chaosDeltaEmf: Double = 0.0
+    @Volatile private var chaosAccel: Double = 0.0
+    @Volatile private var chaosZScore: Double = 0.0
+
+    // == Motore radio-static caotico deterministico (Logistic Map + Biquad IIR) ==
+    // ZERO Random() - tutta la sintesi e deterministica pilotata dai sensori fisici
     private fun startRadioStatic() {
         if (isStaticPlaying) return
         isStaticPlaying = true
         thread {
             try {
                 val sampleRate = 22050
-                val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                val minBuf = AudioTrack.getMinBufferSize(
+                    sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 val bufSize = maxOf(minBuf, 2048)
                 val buffer = ShortArray(bufSize)
                 staticTrack = AudioTrack(
@@ -381,19 +396,80 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
                     bufSize, AudioTrack.MODE_STREAM
                 )
                 staticTrack?.play()
-                var phase = 0.0
-                val random = Random(System.currentTimeMillis())
+
+                // Stato oscillatore caotico logistic map
+                var logX = 0.5          // condizione iniziale deterministica
+                var phase = 0.0         // fase FM accumulata
+                var tremoloPhase = 0.0  // fase tremolo AM da accelerometro
+                val dt = 1.0 / sampleRate
+
+                // Stato filtro biquad passabanda dinamico
+                var bqX1 = 0.0; var bqX2 = 0.0
+                var bqY1 = 0.0; var bqY2 = 0.0
+                var bqB0 = 1.0; var bqB2 = -1.0
+                var bqA1 = 0.0; var bqA2 = 0.0
+
+                fun updateBiquad(cutHz: Double, q: Double) {
+                    val omega = 2.0 * Math.PI * cutHz / sampleRate
+                    val sinW = kotlin.math.sin(omega)
+                    val cosW = kotlin.math.cos(omega)
+                    val alpha = sinW / (2.0 * q)
+                    val a0inv = 1.0 / (1.0 + alpha)
+                    bqB0 =  alpha * a0inv
+                    bqB2 = -alpha * a0inv
+                    bqA1 = -2.0 * cosW * a0inv
+                    bqA2 = (1.0 - alpha) * a0inv
+                }
+
                 while (isStaticPlaying) {
-                    val coupling = staticCoupling.toDouble()
-                    val pitchHz = staticPitchHz.toDouble().coerceIn(200.0, 2000.0)
-                    val noiseAmp = (1.0 - coupling * 0.6).coerceIn(0.1, 1.0)
-                    val toneAmp = coupling * 0.4
+                    val dEmf   = chaosDeltaEmf
+                    val accel  = chaosAccel
+                    val zScore = chaosZScore
+
+                    // r del logistic map: 3.57 (quasi-periodico) -> 4.0 (caos pieno)
+                    val rParam = (3.72 + kotlin.math.abs(dEmf) * 0.08).coerceIn(3.57, 4.0)
+
+                    // Coupling sensoriale [0.0 - 1.0]
+                    val coupling = (kotlin.math.abs(zScore) / 4.0 + accel / 3.0).coerceIn(0.0, 1.0)
+
+                    // Frequenza portante eterodina dalla sintonia corrente
+                    val baseCarrierHz = staticPitchHz.toDouble().coerceIn(200.0, 2000.0)
+                    val emfFmShift = dEmf * 120.0  // Hz per uT di deviazione
+
+                    // Biquad dinamico: cutoff e Q inseguono l'energia sensoriale
+                    val cutoffHz = (800.0 + kotlin.math.abs(zScore) * 280.0).coerceIn(200.0, 3000.0)
+                    val qFactor  = (1.0 + accel * 2.5).coerceIn(0.5, 8.0)
+                    updateBiquad(cutoffHz, qFactor)
+
+                    // Tremolo AM da accelerometro
+                    val tremoloRateHz = (0.5 + kotlin.math.abs(accel) * 2.5).coerceIn(0.5, 6.0)
+                    val tremoloDepth  = (0.15 + coupling * 0.45).coerceIn(0.15, 0.6)
+
                     for (i in buffer.indices) {
-                        val noise = (random.nextDouble() * 2.0 - 1.0) * noiseAmp * 3000.0
-                        val tone = kotlin.math.sin(2.0 * Math.PI * pitchHz * phase) * toneAmp * 8000.0
-                        phase += 1.0 / sampleRate
-                        if (phase > 1.0) phase -= 1.0
-                        buffer[i] = (noise + tone).toInt().coerceIn(-32767, 32767).toShort()
+                        // 1. Oscillatore caotico logistic map
+                        logX = rParam * logX * (1.0 - logX)
+                        if (logX.isNaN() || logX.isInfinite()) logX = 0.5
+                        val chaosRaw = logX * 2.0 - 1.0  // [-1, +1]
+
+                        // 2. FM: fase accumulata sample-by-sample
+                        phase += (baseCarrierHz + emfFmShift) * dt
+                        if (phase > 1e6) phase -= 1e6
+                        val carrier = kotlin.math.sin(2.0 * Math.PI * phase)
+
+                        // 3. Tremolo AM da accelerometro
+                        tremoloPhase += tremoloRateHz * dt
+                        if (tremoloPhase > 1e6) tremoloPhase -= 1e6
+                        val tremolo = 1.0 - tremoloDepth * (0.5 + 0.5 * kotlin.math.sin(2.0 * Math.PI * tremoloPhase))
+
+                        // 4. Miscela caos + carrier + tremolo
+                        val mixed = (chaosRaw * (1.0 - coupling * 0.6) + carrier * coupling * 0.4) * tremolo
+
+                        // 5. Filtro biquad IIR passabanda
+                        val filtered = bqB0 * mixed + bqB2 * bqX2 - bqA1 * bqY1 - bqA2 * bqY2
+                        bqX2 = bqX1; bqX1 = mixed
+                        bqY2 = bqY1; bqY1 = filtered
+
+                        buffer[i] = (filtered * 22000.0).toInt().coerceIn(-32767, 32767).toShort()
                     }
                     staticTrack?.write(buffer, 0, buffer.size)
                 }
@@ -404,6 +480,12 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
     private fun updateStaticModulation(coupling: Float, pitchHz: Float) {
         staticCoupling = coupling
         staticPitchHz = pitchHz
+    }
+
+    private fun updateStaticChaosParams(deltaEmf: Double, accel: Double, zScore: Double) {
+        chaosDeltaEmf = deltaEmf
+        chaosAccel    = accel
+        chaosZScore   = zScore
     }
 
     private fun stopRadioStatic() {

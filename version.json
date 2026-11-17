@@ -1,10 +1,10 @@
 {
-  "latest_version": "v27-beta2.4",
-  "build_number": 276,
-  "release_date": "2026-11-16",
-  "release_title": "AetherScan-Pro v27-beta2.4 Metrology Suite",
-  "notes": "Motore audio sweep reale su iOS (fruscio radio AM/FM filtrato su speaker), sensore urti e vibrazioni live m/s2 continuo su iPhone con feedback acustico immediato, e download diretto con un tocco da Safari/AltStore.",
-  "download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/tag/v27-beta2.4",
-  "ios_download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.4/AetherScan-Pro-v27-beta2.4-Metrology-unsigned.ipa",
-  "android_download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.4/AetherScan-Pro-v27-beta2.4-Metrology.apk"
+  "latest_version": "v27-beta2.5",
+  "build_number": 277,
+  "release_date": "2026-11-17",
+  "release_title": "AetherScan-Pro v27-beta2.5 Metrology Suite",
+  "notes": "Motore DSP Lorenz: oscillatore caotico reale pilotato da sensori EMF + accelerometro in tempo reale. Filtro Biquad IIR passabanda dinamico (cutoff e Q inseguono l'energia sensoriale). Nessun loop statico, nessun rumore bianco piatto. Fruscio radio AM/FM organico e non ripetitivo.",
+  "download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/tag/v27-beta2.5",
+  "ios_download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.5/AetherScan-Pro-v27-beta2.5-Metrology-unsigned.ipa",
+  "android_download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.5/AetherScan-Pro-v27-beta2.5-Metrology.apk"
 }

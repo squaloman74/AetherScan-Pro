@@ -36,7 +36,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.4 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2.5 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -348,8 +348,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ? 600.0 + ((_spectralSweepEngine.currentFrequency - 87.5) / (108.0 - 87.5)) * 1400.0
                 : 400.0 + ((_spectralSweepEngine.currentFrequency - 530.0) / (1600.0 - 530.0)) * 1200.0;
             final double effectivePitch = (basePitch + (deltaEmf * 12.0)).clamp(200.0, 3000.0);
-            _audioChannel.invokeMethod('playModulatedStatic', {
-              'coupling': frame.sensorCouplingFactor,
+            // Aggiorna parametri DSP caotico nel thread nativo (Android/iOS)
+            _audioChannel.invokeMethod('updateStaticParams', {
+              'emfDelta': deltaEmf,
+              'accel': _currentDynamicVib,
+              'zScore': zScore,
               'pitchHz': effectivePitch,
             });
           } catch (_) {}
@@ -497,7 +500,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
             SizedBox(width: 8),
             Text(
-              'AETHERSCAN-PRO v27-beta2.4',
+              'AETHERSCAN-PRO v27-beta2.5',
               style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ],
@@ -532,7 +535,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Specifiche Release v27-beta2.4 (Build 2.0.27+6):',
+              'Specifiche Release v27-beta2.5 (Build 2.0.27+7):',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
             ),
             const SizedBox(height: 6),
@@ -612,7 +615,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             : (androidUrl ?? defaultUrl);
 
         if (!mounted) return;
-        if (latest.isNotEmpty && latest != 'v27-beta2.4') {
+        if (latest.isNotEmpty && latest != 'v27-beta2.5') {
           _showUpdateResultDialog(
             isNewAvailable: true,
             version: latest,
@@ -623,7 +626,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         } else {
           _showUpdateResultDialog(
             isNewAvailable: false,
-            version: latest.isNotEmpty ? latest : 'v27-beta2.4',
+            version: latest.isNotEmpty ? latest : 'v27-beta2.5',
             message: 'Sei all\'ultima versione disponibile. Tutti i moduli scientifici sono aggiornati.',
           );
           return;
@@ -632,7 +635,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     } catch (_) {}
 
     if (mounted) {
-      _showToast('Sei all\'ultima versione disponibile: v27-beta2.4');
+      _showToast('Sei all\'ultima versione disponibile: v27-beta2.5');
     }
   }
 
@@ -783,7 +786,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.4 • SCIENTIFIC METROLOGY',
+                  'v27-beta2.5 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -894,7 +897,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ListTile(
             leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
             title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-            subtitle: const Text('v27-beta2.4 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            subtitle: const Text('v27-beta2.5 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
             onTap: () {
               Navigator.pop(context);
               _showVersionInfoDialog();
@@ -964,8 +967,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                   ),
                   Text(
                     _activeMode == AppOperatingMode.metrologyPro
-                        ? 'v27-beta2.4 • METROLOGY'
-                        : 'v27-beta2.4 • SWEEP',
+                        ? 'v27-beta2.5 • METROLOGY'
+                        : 'v27-beta2.5 • SWEEP',
                     style: TextStyle(
                       fontSize: 8,
                       color: _activeMode == AppOperatingMode.metrologyPro

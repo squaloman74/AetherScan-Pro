@@ -1,4 +1,4 @@
-name: Build AetherScan Pro iOS (IPA) - v27-beta2.4 Metrology
+name: Build AetherScan Pro iOS (IPA) - v27-beta2.5 Metrology
 
 on:
   push:
@@ -39,23 +39,23 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r AetherScan-Pro-v27-beta2.4-Metrology-unsigned.ipa Payload
+          zip -r AetherScan-Pro-v27-beta2.5-Metrology-unsigned.ipa Payload
           mkdir -p release-ios
-          mv AetherScan-Pro-v27-beta2.4-Metrology-unsigned.ipa release-ios/
+          mv AetherScan-Pro-v27-beta2.5-Metrology-unsigned.ipa release-ios/
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AetherScan-Pro-v27-beta2.4-iOS-IPA
+          name: AetherScan-Pro-v27-beta2.5-iOS-IPA
           path: ios-repo/release-ios/*.ipa
 
-      - name: Create GitHub Release with v27-beta2.4 IPA
+      - name: Create GitHub Release with v27-beta2.5 IPA
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v27-beta2.4
-          name: "AetherScan Pro v27-beta2.4 Metrology - iOS (IPA Unsigned)"
+          tag_name: v27-beta2.5
+          name: "AetherScan Pro v27-beta2.5 Metrology - iOS (IPA Unsigned)"
           body: |
-            ## AetherScan Pro v2.0 (v27-beta2.4) — Release Ufficiale iOS
+            ## AetherScan Pro v2.0 (v27-beta2.5) — Release Ufficiale iOS
             **Data build:** 16/11/2026
             
             ### Novità e Specifiche Metrologiche:
