@@ -1,13 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aetherscan_pro/vocal_trigger_engine.dart';
+import 'package:aetherscan_pro/metrology_lexicon.dart';
+import 'package:aetherscan_pro/investigative_lexicon.dart';
+import 'package:aetherscan_pro/names_lexicon.dart';
 
 void main() {
-  group('VocalTriggerEngine — Test di Isolamento e Risonanza Deterministica', () {
+  group('VocalTriggerEngine — Test Multi-Bank e Risonanza Deterministica', () {
     late VocalTriggerEngine engine;
 
     setUp(() {
       engine = VocalTriggerEngine(
         isEnabled: false, // Spento di default
+        currentBank: VocalLexiconBank.metrology,
         zScoreThreshold: 3.0,
         minDeltaEmf: 1.5,
         minPersistenceMs: 150,
@@ -36,7 +40,6 @@ void main() {
       engine.setEnabled(true);
       final now = DateTime.now();
 
-      // Valori normali di fondo
       final event = engine.evaluate(
         now: now,
         deltaEmf: 0.3,
@@ -53,7 +56,6 @@ void main() {
       engine.setEnabled(true);
       final t0 = DateTime(2026, 1, 1, 12, 0, 0, 0);
 
-      // Inizio anomalia a t0
       final e1 = engine.evaluate(
         now: t0,
         deltaEmf: 4.5,
@@ -62,9 +64,8 @@ void main() {
         lorenzX: 5.0,
         currentFrequency: 92.5,
       );
-      expect(e1, isNull); // Primo campione, registra inizio
+      expect(e1, isNull);
 
-      // Campione a 100ms (< 150ms)
       final t1 = t0.add(const Duration(milliseconds: 100));
       final e2 = engine.evaluate(
         now: t1,
@@ -74,9 +75,8 @@ void main() {
         lorenzX: 5.2,
         currentFrequency: 92.5,
       );
-      expect(e2, isNull); // Ancora in finestra di persistenza
+      expect(e2, isNull);
 
-      // Campione a 160ms (>= 150ms) -> TRIGGER
       final t2 = t0.add(const Duration(milliseconds: 160));
       final e3 = engine.evaluate(
         now: t2,
@@ -88,26 +88,78 @@ void main() {
       );
       expect(e3, isNotNull);
       expect(e3!.word, isNotEmpty);
-      expect(VocalTriggerEngine.lexicon.contains(e3.word), isTrue);
+      expect(MetrologyLexicon.words.contains(e3.word), isTrue);
+      expect(e3.bank, equals(VocalLexiconBank.metrology));
     });
 
-    test('Determinismo Puro (Zero Random): medesime grandezze generano la medesima parola', () {
+    test('Multi-Bank: Bank B (Investigativo) emette vocaboli investigativi dedicati', () {
       engine.setEnabled(true);
-      final t0 = DateTime(2026, 1, 1, 10, 0, 0);
+      engine.setBank(VocalLexiconBank.investigative);
+
+      final t0 = DateTime(2026, 1, 1, 14, 0, 0);
       final tPersist = t0.add(const Duration(milliseconds: 200));
 
-      engine.evaluate(now: t0, deltaEmf: 6.0, zScoreEmf: 4.2, dynamicAccel: 0.8, lorenzX: 8.0, currentFrequency: 99.0);
-      final eA = engine.evaluate(now: tPersist, deltaEmf: 6.0, zScoreEmf: 4.2, dynamicAccel: 0.8, lorenzX: 8.0, currentFrequency: 99.0);
-      expect(eA, isNotNull);
+      engine.evaluate(now: t0, deltaEmf: 5.5, zScoreEmf: 3.9, dynamicAccel: 1.0, lorenzX: 7.0, currentFrequency: 95.0);
+      final event = engine.evaluate(now: tPersist, deltaEmf: 5.5, zScoreEmf: 3.9, dynamicAccel: 1.0, lorenzX: 7.0, currentFrequency: 95.0);
 
-      // Nuovo motore identico
-      final engine2 = VocalTriggerEngine(isEnabled: true);
-      engine2.evaluate(now: t0, deltaEmf: 6.0, zScoreEmf: 4.2, dynamicAccel: 0.8, lorenzX: 8.0, currentFrequency: 99.0);
-      final eB = engine2.evaluate(now: tPersist, deltaEmf: 6.0, zScoreEmf: 4.2, dynamicAccel: 0.8, lorenzX: 8.0, currentFrequency: 99.0);
-      expect(eB, isNotNull);
+      expect(event, isNotNull);
+      expect(event!.bank, equals(VocalLexiconBank.investigative));
+      expect(InvestigativeLexicon.words.contains(event.word), isTrue);
+    });
 
-      // Stessa parola deterministica garantita
-      expect(eA!.word, equals(eB!.word));
+    test('Multi-Bank: Bank C (Anagrafico - Solo Nomi) emette solo nomi di battesimo validati', () {
+      engine.setEnabled(true);
+      engine.setBank(VocalLexiconBank.names);
+
+      final t0 = DateTime(2026, 1, 1, 16, 0, 0);
+      final tPersist = t0.add(const Duration(milliseconds: 200));
+
+      engine.evaluate(now: t0, deltaEmf: 6.2, zScoreEmf: 4.1, dynamicAccel: 0.5, lorenzX: 3.2, currentFrequency: 101.2);
+      final event = engine.evaluate(now: tPersist, deltaEmf: 6.2, zScoreEmf: 4.1, dynamicAccel: 0.5, lorenzX: 3.2, currentFrequency: 101.2);
+
+      expect(event, isNotNull);
+      expect(event!.bank, equals(VocalLexiconBank.names));
+      expect(NamesLexicon.words.contains(event.word), isTrue);
+      // Garanzia privacy: ogni elemento Ã¨ una singola parola di battesimo
+      expect(event.word.contains(' '), isFalse);
+    });
+
+    test('Multi-Bank: Rotational Mode seleziona deterministicamente tra i banchi', () {
+      engine.setEnabled(true);
+      engine.setBank(VocalLexiconBank.rotational);
+
+      final t0 = DateTime(2026, 1, 1, 18, 0, 0);
+      final tPersist = t0.add(const Duration(milliseconds: 200));
+
+      engine.evaluate(now: t0, deltaEmf: 7.0, zScoreEmf: 4.5, dynamicAccel: 1.5, lorenzX: 4.0, currentFrequency: 90.0);
+      final event = engine.evaluate(now: tPersist, deltaEmf: 7.0, zScoreEmf: 4.5, dynamicAccel: 1.5, lorenzX: 4.0, currentFrequency: 90.0);
+
+      expect(event, isNotNull);
+      expect(event!.bank != VocalLexiconBank.rotational, isTrue); // risolto in uno dei banchi effettivi
+      final allWords = [
+        ...MetrologyLexicon.words,
+        ...InvestigativeLexicon.words,
+        ...NamesLexicon.words,
+      ];
+      expect(allWords.contains(event.word), isTrue);
+    });
+
+    test('Determinismo Assoluto: medesimi sensori generano sempre la stessa parola', () {
+      engine.setEnabled(true);
+      engine.setBank(VocalLexiconBank.investigative);
+
+      final t0 = DateTime(2026, 1, 1, 20, 0, 0);
+      final tPersist = t0.add(const Duration(milliseconds: 200));
+
+      engine.evaluate(now: t0, deltaEmf: 8.0, zScoreEmf: 4.8, dynamicAccel: 1.1, lorenzX: 9.0, currentFrequency: 105.0);
+      final e1 = engine.evaluate(now: tPersist, deltaEmf: 8.0, zScoreEmf: 4.8, dynamicAccel: 1.1, lorenzX: 9.0, currentFrequency: 105.0);
+
+      final engineB = VocalTriggerEngine(isEnabled: true, currentBank: VocalLexiconBank.investigative);
+      engineB.evaluate(now: t0, deltaEmf: 8.0, zScoreEmf: 4.8, dynamicAccel: 1.1, lorenzX: 9.0, currentFrequency: 105.0);
+      final e2 = engineB.evaluate(now: tPersist, deltaEmf: 8.0, zScoreEmf: 4.8, dynamicAccel: 1.1, lorenzX: 9.0, currentFrequency: 105.0);
+
+      expect(e1!.word, equals(e2!.word));
+      expect(e1.bank, equals(e2.bank));
     });
 
     test('Cooldown Refrattario: blocca emissioni successive per 7 secondi', () {
@@ -119,15 +171,13 @@ void main() {
       final e1 = engine.evaluate(now: tTrigger, deltaEmf: 5.0, zScoreEmf: 3.5, dynamicAccel: 1.0, lorenzX: 2.0, currentFrequency: 95.0);
       expect(e1, isNotNull);
 
-      // Anomalia ancora presente a 3 secondi (< 7s) -> silenziata da cooldown
       final tCooldown = tTrigger.add(const Duration(seconds: 3));
       final e2 = engine.evaluate(now: tCooldown, deltaEmf: 8.0, zScoreEmf: 5.0, dynamicAccel: 2.0, lorenzX: 4.0, currentFrequency: 95.0);
       expect(e2, isNull);
 
-      // A 7.5 secondi (fine cooldown) -> nuova persistenza richiesta
       final tAfter = tTrigger.add(const Duration(milliseconds: 7500));
       final e3 = engine.evaluate(now: tAfter, deltaEmf: 8.0, zScoreEmf: 5.0, dynamicAccel: 2.0, lorenzX: 4.0, currentFrequency: 95.0);
-      expect(e3, isNull); // Inizia nuova finestra di persistenza
+      expect(e3, isNull);
 
       final tAfterPersist = tAfter.add(const Duration(milliseconds: 160));
       final e4 = engine.evaluate(now: tAfterPersist, deltaEmf: 8.0, zScoreEmf: 5.0, dynamicAccel: 2.0, lorenzX: 4.0, currentFrequency: 95.0);

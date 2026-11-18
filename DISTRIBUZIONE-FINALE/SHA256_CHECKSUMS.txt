@@ -1,5 +1,5 @@
-# AetherScan-Pro v27-beta2.6 — SHA256 CHECKSUMS (Metrology Suite)
-# Generato: 2026-11-18 18:29:50
+# AetherScan-Pro v27-beta2.6 — SHA256 CHECKSUMS (Metrology Suite Multi-Bank)
+# Generato: 2026-11-18 19:33:16
 #
-D656B374888998074BEEB4C5139A57BC9C771845E47A1FB4A72D1A905AA3E460  AetherScan-Pro-v27-beta2.6-Metrology.apk
+24C8258C1324D8D6666BBBEF379AC47DF759064675F883022855E2FC6119AA32  AetherScan-Pro-v27-beta2.6-Metrology.apk
 IPA_SHA256_PENDING_MACOS_CI  AetherScan-Pro-v27-beta2.6-Metrology-unsigned.ipa (in compilazione da GitHub Actions macOS)

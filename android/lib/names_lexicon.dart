@@ -1,0 +1,23 @@
+/// Bank C: Dizionario Anagrafico â€” Solo Nomi di Battesimo (128 nomi)
+/// Rigorosa selezione di soli nomi propri tradizionali italiani.
+/// CATEGORICAMENTE ESCLUSO qualsiasi cognome a totale tutela della privacy.
+class NamesLexicon {
+  static const List<String> words = [
+    'MARCO', 'ANNA', 'LUCA', 'GIULIA', 'FRANCESCO', 'ELENA', 'MATTEO', 'CHIARA',
+    'ALESSANDRO', 'SARA', 'ANDREA', 'VALENTINA', 'LORENZO', 'FEDERICA', 'GIUSEPPE', 'MARIA',
+    'ANTONIO', 'SILVIA', 'ROBERTO', 'PAOLA', 'STEFANO', 'LAURA', 'DAVIDE', 'ELISA',
+    'GIOVANNI', 'MARTINA', 'PAOLO', 'SIMONA', 'MICHELE', 'CLAUDIA', 'FEDERICO', 'BEATRICE',
+    'PIETRO', 'GIORGIA', 'FABIO', 'ALICE', 'DANIELE', 'IRENE', 'VINCENZO', 'MONICA',
+    'SALVATORE', 'ROBERTA', 'EMANUELE', 'CRISTINA', 'CLAUDIO', 'BARBARA', 'CARLO', 'ELEONORA',
+    'MASSIMO', 'DANIELA', 'RICCARDO', 'FRANCESCA', 'ALBERTO', 'CARLA', 'VITO', 'CAMILLA',
+    'GIORGIO', 'VERONICA', 'MARIO', 'SERENA', 'ANGELO', 'VITTORIA', 'ENRICO', 'LUDOVICA',
+    'DOMENICO', 'SOFIA', 'GIACOMO', 'NOEMI', 'FILIPPO', 'GRETA', 'CRISTIAN', 'GINEVRA',
+    'LUIGI', 'CATERINA', 'NICOLA', 'ALESSIA', 'RAFFAELE', 'BIANCA', 'BRUNO', 'ROSA',
+    'CESARE', 'TERESA', 'GUIDO', 'LUCIA', 'RENATO', 'RITA', 'MAURIZIO', 'MARGHERITA',
+    'MASSIMILIANO', 'SABRINA', 'FABRIZIO', 'GLORIA', 'ADRIANO', 'CARMEN', 'DINO', 'VALERIA',
+    'EMILIO', 'ADELE', 'ITALO', 'AGNESE', 'DARIO', 'FLAVIA', 'FLAVIO', 'LIA',
+    'LINO', 'EMMA', 'EZIO', 'IDA', 'UGO', 'EVA', 'ALDO', 'PIA',
+    'LEO', 'TINA', 'TULLIO', 'NINA', 'REMO', 'CLELIA', 'ELIO', 'MARINA',
+    'CORRADO', 'LILIANA', 'GASTONE', 'SANDRA', 'SERGIO', 'DIANA', 'GABRIELE', 'AURORA',
+  ];
+}

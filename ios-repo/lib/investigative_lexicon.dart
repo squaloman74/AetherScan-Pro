@@ -1,0 +1,22 @@
+/// Bank B: Dizionario Investigativo Classico (128 termini)
+/// Vocabolario mirato per indagini ambientali, luoghi storici e ricerca sul campo.
+class InvestigativeLexicon {
+  static const List<String> words = [
+    'ASCOLTO', 'CHI', 'DOVE', 'QUANDO', 'PERCHE', 'AIUTO', 'STANZA', 'PORTA',
+    'FINESTRA', 'LUCE', 'BUIO', 'VOCE', 'PARLA', 'GUIDA', 'SENTI', 'RISPONDI',
+    'VICINO', 'LONTANO', 'QUI', 'ALTROVE', 'SEGNALE', 'TELAIO', 'MURO', 'PASSI',
+    'OMBRA', 'FREDDO', 'ATTESA', 'FERMO', 'VAI', 'RESTA', 'NOME', 'STORIA',
+    'CASA', 'TERRA', 'ACQUA', 'FUOCO', 'VENTO', 'SPECCHIO', 'SEGRETO', 'NASCOSTO',
+    'LIBERO', 'CHIUSO', 'APERTO', 'DOLORE', 'PACE', 'RITORNO', 'GIORNO', 'NOTTE',
+    'PERDUTO', 'TROVATO', 'RICORDO', 'TEMPO', 'PASSATO', 'PRESENTE', 'SOSPESO', 'AVANTI',
+    'DIETRO', 'SOPRA', 'SOTTO', 'ANGOLO', 'CORRIDOIO', 'SCALA', 'TETTO', 'PIANO',
+    'CHIAVE', 'SERRATURA', 'CHIUSURA', 'CATENA', 'LIBRO', 'PAROLA', 'PENSIERO', 'SOGNO',
+    'PAURA', 'CORAGGIO', 'FORZA', 'DEBOLE', 'SILENZIO', 'RUMORE', 'GRIDO', 'SUSSURRO',
+    'CANDELA', 'FIAMMA', 'CENERE', 'POLVERE', 'OROLOGIO', 'MINUTO', 'ORA', 'FINE',
+    'INIZIO', 'VIAGGIO', 'CAMMINO', 'STRADA', 'CROCE', 'PIETRA', 'FERRO', 'LEGNO',
+    'VETRO', 'QUADRO', 'LETTERA', 'MESSAGGIO', 'AVVISO', 'GUARDA', 'CERCA', 'TROVA',
+    'DIMMI', 'ASCOLTA', 'COMPAGNO', 'AMICO', 'OSPITE', 'VIANDANTE', 'CUSTODE', 'ANTICO',
+    'SEPOLTO', 'DIMENTICATO', 'PRESENTE', 'VICINANZA', 'CONTATTO', 'FREDDO', 'CALORE', 'SOSPIRO',
+    'RISVEGLIO', 'DORMIENTE', 'MEMORIA', 'VISIONE', 'RIVERBERO', 'LEGAME', 'PATTO', 'VERITA',
+  ];
+}

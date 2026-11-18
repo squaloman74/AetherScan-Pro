@@ -1,9 +1,59 @@
 import 'dart:math';
 
+import 'metrology_lexicon.dart';
+import 'investigative_lexicon.dart';
+import 'names_lexicon.dart';
+
+/// Banco lessicale attivo per il modulo vocale deterministico
+enum VocalLexiconBank {
+  /// Bank A: Vocabolario metrologico e fisico (128 termini)
+  metrology,
+
+  /// Bank B: Vocabolario investigativo classico sul campo (128 termini)
+  investigative,
+
+  /// Bank C: Anagrafico â€” Solo Nomi di battesimo (128 nomi, zero cognomi per privacy)
+  names,
+
+  /// ModalitÃ  combinata: selezione dinamica deterministica del banco basata sull'hash energetico
+  rotational,
+}
+
+extension VocalLexiconBankExt on VocalLexiconBank {
+  String get label {
+    switch (this) {
+      case VocalLexiconBank.metrology:
+        return 'METR';
+      case VocalLexiconBank.investigative:
+        return 'INV';
+      case VocalLexiconBank.names:
+        return 'NOMI';
+      case VocalLexiconBank.rotational:
+        return 'AUTO';
+    }
+  }
+
+  String get displayName {
+    switch (this) {
+      case VocalLexiconBank.metrology:
+        return 'Bank A: Metrologico';
+      case VocalLexiconBank.investigative:
+        return 'Bank B: Investigativo';
+      case VocalLexiconBank.names:
+        return 'Bank C: Solo Nomi';
+      case VocalLexiconBank.rotational:
+        return 'Multi-Bank (Rotazione)';
+    }
+  }
+}
+
 /// Evento generato dal motore di risonanza vocale
 class VocalTriggerEvent {
   /// Parola selezionata deterministicamente dal dizionario
   final String word;
+
+  /// Banco lessicale di origine
+  final VocalLexiconBank bank;
 
   /// Z-Score di attivazione al momento del trigger
   final double zScore;
@@ -19,6 +69,7 @@ class VocalTriggerEvent {
 
   const VocalTriggerEvent({
     required this.word,
+    this.bank = VocalLexiconBank.metrology,
     required this.zScore,
     required this.deltaEmf,
     required this.dynamicAccel,
@@ -27,20 +78,22 @@ class VocalTriggerEvent {
 
   @override
   String toString() =>
-      'VocalTriggerEvent("$word", Z=${zScore.toStringAsFixed(2)}, Î”EMF=${deltaEmf.toStringAsFixed(1)}ÂµT)';
+      'VocalTriggerEvent("${bank.label}:$word", Z=${zScore.toStringAsFixed(2)}, Î”EMF=${deltaEmf.toStringAsFixed(1)}ÂµT)';
 }
 
-/// Motore Vocale Custom "Real-Trigger" Deterministico (No-Whisper / No-AI pesante)
-/// ==============================================================================
-/// Regole ferree:
-/// 1. Zero carico pesante: nessuna rete neurale, nessun server esterno, <2MB RAM.
-/// 2. Zero parole a caso: nessun Random() o allucinazione probabilistica.
-/// 3. Attivazione reale su soglia energetica (|Z| >= 3.0 e persistenza temporale >= 150ms).
-/// 4. Indirizzamento matematico deterministico nel dizionario via Spatial Energy Hash.
-/// 5. Spento di default (isEnabled = false) con cooldown refrattario (6-10s).
+/// Motore Vocale Custom "Real-Trigger" Multi-Bank Deterministico (Zero-AI / Zero-Random)
+/// ======================================================================================
+/// Architettura modulare:
+/// - Bank A: MetrologyLexicon.words (128 termini fisici/ambientali)
+/// - Bank B: InvestigativeLexicon.words (128 termini investigativi sul campo)
+/// - Bank C: NamesLexicon.words (128 soli nomi di battesimo, zero cognomi a tutela privacy)
+/// - ModalitÃ  Rotational: rotazione deterministica tra i banchi basata sull'energia reale dei sensori.
 class VocalTriggerEngine {
   /// Stato globale di abilitazione del modulo vocale (spento di default)
   bool isEnabled;
+
+  /// Banco lessicale attualmente selezionato
+  VocalLexiconBank currentBank;
 
   /// Soglia minima di deviazione statistica (|Z| >= 3.0Ïƒ)
   final double zScoreThreshold;
@@ -67,31 +120,34 @@ class VocalTriggerEngine {
 
   VocalTriggerEngine({
     this.isEnabled = false,
+    this.currentBank = VocalLexiconBank.metrology,
     this.zScoreThreshold = 3.0,
     this.minDeltaEmf = 1.5,
     this.minPersistenceMs = 150,
     this.cooldownMs = 7000,
   });
 
-  /// Dizionario deterministico calibrato (128 parole esatte di fisica, metrologia e indagine)
-  static const List<String> lexicon = [
-    'PRESENZA', 'ENERGIA', 'CAMPO', 'FLUSSO', 'SOGLIA', 'OMBRA', 'ONDA', 'CONTATTO',
-    'FREQUENZA', 'RISUONATORE', 'PORTALE', 'ECO', 'RADIAZIONE', 'SEGNALE', 'POLARITA', 'MEMORIA',
-    'CORRENTE', 'VORTICE', 'LINEA', 'DISTORSIONE', 'ANOMALIA', 'PULSAZIONE', 'STATO', 'SPOSTAMENTO',
-    'ARIA', 'COLPO', 'ATTESA', 'MOVIMENTO', 'CENTRO', 'VICINO', 'DISTANTE', 'PROFONDO',
-    'RISPOSTA', 'VOCE', 'RESPIRO', 'PESO', 'DIREZIONE', 'TEMPO', 'INTENSITA', 'FASCIO',
-    'ATTRAVERSAMENTO', 'RIFLESSO', 'VUOTO', 'FREDDO', 'CALORE', 'GRADIENTE', 'EQUILIBRIO', 'ROTTURA',
-    'TRACCIA', 'IMPRONTA', 'ORIGINE', 'LIMITE', 'SISTEMA', 'FONTE', 'INTERFERENZA', 'SPECCHIO',
-    'SILENZIO', 'SUONO', 'IMPATTO', 'DERIVA', 'MASSA', 'VETTORE', 'DIMENSIONE', 'RITORNO',
-    'SCONOSCIUTO', 'CONFINE', 'FLUTTUAZIONE', 'AMPIEZZA', 'FASE', 'CONVERGENZA', 'NUCLEO', 'SPETTRO',
-    'ATTIVAZIONE', 'SPAZIO', 'SENSORE', 'CONTORNO', 'STRUTTURA', 'LUCE', 'INVISIBILE', 'PASSO',
-    'BATTITO', 'DISTACCO', 'CARICA', 'POTENZIALE', 'LEGATA', 'SEPARAZIONE', 'EMERSIONE', 'CONNESSO',
-    'ATTRAZIONE', 'RESPINTA', 'VARIAZIONE', 'NOTTE', 'FORMA', 'RESTO', 'FERMO', 'DISPERSIONE',
-    'VIBRAZIONE', 'TENSIONE', 'RESISTENZA', 'ISOLAMENTO', 'CADUTA', 'VELOCITA', 'ASCESA', 'CONFINI',
-    'RESTANTE', 'DILATAZIONE', 'CONDENSATO', 'PUNTO', 'NODI', 'CIRCUITO', 'SECONDO', 'PRIMO',
-    'ESTERNO', 'INTERNO', 'MATERIA', 'ANTICO', 'SOTTILE', 'OSCURO', 'CHIARO', 'DEFINITO',
-    'CONTINUO', 'INTERROTTO', 'REALE', 'ETERE', 'CORPO', 'SPINTA', 'INCLINAZIONE', 'FERMA',
-  ];
+  /// Dizionario Bank A predefinito per retrocompatibilitÃ  con test e logica legacy
+  static const List<String> lexicon = MetrologyLexicon.words;
+
+  /// Restituisce la lista di parole per il banco specificato
+  static List<String> getWordsForBank(VocalLexiconBank bank) {
+    switch (bank) {
+      case VocalLexiconBank.metrology:
+        return MetrologyLexicon.words;
+      case VocalLexiconBank.investigative:
+        return InvestigativeLexicon.words;
+      case VocalLexiconBank.names:
+        return NamesLexicon.words;
+      case VocalLexiconBank.rotational:
+        return MetrologyLexicon.words;
+    }
+  }
+
+  /// Imposta il banco lessicale attivo
+  void setBank(VocalLexiconBank bank) {
+    currentBank = bank;
+  }
 
   /// Abilita o disabilita il modulo vocale
   void setEnabled(bool enabled) {
@@ -108,7 +164,7 @@ class VocalTriggerEngine {
     _lastSpokenTime = null;
   }
 
-  /// Valutazione deterministica in tempo reale.
+  /// Valutazione deterministica in tempo reale con supporto Multi-Bank.
   /// Ritorna [VocalTriggerEvent] solo se:
   /// 1. Il modulo Ã¨ abilitato (isEnabled == true).
   /// 2. Il periodo di cooldown (6-10s) Ã¨ trascorso.
@@ -140,7 +196,7 @@ class VocalTriggerEngine {
     final bool isAnomalyActive = absZ >= zScoreThreshold && absDelta >= minDeltaEmf;
 
     if (!isAnomalyActive) {
-      // Condizione ambientale normale: reset del contatore di persistenza
+      // Condizione ambientale normale: reset contatore persistenza
       _anomalyStartTime = null;
       return null;
     }
@@ -153,29 +209,49 @@ class VocalTriggerEngine {
 
     final int durationMs = now.difference(_anomalyStartTime!).inMilliseconds;
     if (durationMs < minPersistenceMs) {
-      // L'anomalia non Ã¨ ancora sufficientemente stabile
       return null;
     }
 
     // 5. Risonanza deterministica: Spatial Energy Hash (Zero Random)
-    // Trasforma le grandezze fisiche dell'anomalia in un indice esatto del dizionario
     final int zPart = (absZ * 1000.0).toInt().abs();
     final int emfPart = (absDelta * 100.0).toInt().abs();
     final int lorenzPart = (lorenzX.abs() * 10000.0).toInt().abs();
     final int freqPart = (currentFrequency * 10.0).toInt().abs();
     final int accelPart = (dynamicAccel * 100.0).toInt().abs();
 
-    // Funzione hash deterministica a 31-bit
     final int hash = (zPart ^ (emfPart * 31) ^ (lorenzPart * 127) ^ (freqPart * 7) ^ accelPart) & 0x7FFFFFFF;
-    final int index = hash % lexicon.length;
-    final String selectedWord = lexicon[index];
 
-    // 6. Registrazione stato ed emissione evento
+    // 6. Selezione del Banco (Deterministica)
+    final VocalLexiconBank effectiveBank;
+    if (currentBank == VocalLexiconBank.rotational) {
+      // Determina il banco in base all'hash dell'energia: rotazione deterministica su 3 banchi
+      final int bankSelector = ((hash >> 16) ^ (hash & 0xFFFF)) % 3;
+      switch (bankSelector) {
+        case 0:
+          effectiveBank = VocalLexiconBank.metrology;
+          break;
+        case 1:
+          effectiveBank = VocalLexiconBank.investigative;
+          break;
+        default:
+          effectiveBank = VocalLexiconBank.names;
+          break;
+      }
+    } else {
+      effectiveBank = currentBank;
+    }
+
+    final List<String> activeList = getWordsForBank(effectiveBank);
+    final int index = hash % activeList.length;
+    final String selectedWord = activeList[index];
+
+    // 7. Registrazione stato ed emissione evento
     _lastSpokenTime = now;
     _anomalyStartTime = null;
 
     final event = VocalTriggerEvent(
       word: selectedWord,
+      bank: effectiveBank,
       zScore: zScoreEmf,
       deltaEmf: deltaEmf,
       dynamicAccel: dynamicAccel,
