@@ -14,12 +14,14 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.speech.tts.TextToSpeech
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
+import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -36,6 +38,8 @@ class MainActivity : FlutterActivity(), SensorEventListener {
     private var staticCoupling: Float = 0.0f
     private var staticPitchHz: Float = 600.0f
     private var creepyMediaPlayer: MediaPlayer? = null
+    private var tts: TextToSpeech? = null
+    private var isTtsReady = false
 
     // Sensori
     private lateinit var sensorManager: SensorManager
@@ -52,6 +56,18 @@ class MainActivity : FlutterActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+
+        // Inizializzazione TTS offline nativo
+        try {
+            tts = TextToSpeech(this) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    val res = tts?.setLanguage(Locale.ITALIAN)
+                    isTtsReady = res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -81,6 +97,13 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     val coupling = call.argument<Double>("coupling") ?: 0.0
                     val pitchHz = call.argument<Double>("pitchHz") ?: 600.0
                     updateStaticModulation(coupling.toFloat(), pitchHz.toFloat())
+                    result.success(true)
+                }
+                "speak" -> {
+                    val text = call.argument<String>("text") ?: ""
+                    val vol = (call.argument<Double>("volume") ?: 1.0).toFloat()
+                    val pitch = (call.argument<Double>("pitch") ?: 1.0).toFloat()
+                    speakText(text, vol, pitch)
                     result.success(true)
                 }
                 "playBeep" -> {
@@ -494,9 +517,27 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
         catch (e: Exception) { e.printStackTrace() }
     }
 
+    private fun speakText(text: String, vol: Float, pitch: Float) {
+        if (tts != null && isTtsReady && text.isNotBlank()) {
+            try {
+                tts?.setPitch(pitch)
+                val params = Bundle()
+                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, vol.coerceIn(0.1f, 1.0f))
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "AETHER_VOCAL_${System.currentTimeMillis()}")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     override fun onDestroy() {
         stopSensors()
         stopRadioStatic()
+        try {
+            tts?.stop()
+            tts?.shutdown()
+            tts = null
+        } catch (e: Exception) { e.printStackTrace() }
         creepyMediaPlayer?.release()
         creepyMediaPlayer = null
         super.onDestroy()

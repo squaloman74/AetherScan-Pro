@@ -15,6 +15,7 @@ import 'forensic_logger.dart';
 import 'industrial_ui.dart';
 import 'spectral_sweep_engine.dart';
 import 'spectral_sweep_view.dart';
+import 'vocal_trigger_engine.dart';
 
 /// Modalità operative selezionabili dal Menu Hamburger
 enum AppOperatingMode {
@@ -36,7 +37,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.5 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2.6 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -97,6 +98,10 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   SweepFrame? _lastSweepFrame;
   bool _isSweepAudioActive = false;
   bool _isMetrologyMonitoringActive = false; // Spento di default, attivato a comando dall'utente
+
+  // ── Modulo Vocale Custom Real-Trigger (Completamente Isolato) ──
+  late final VocalTriggerEngine _vocalTriggerEngine;
+  VocalTriggerEvent? _lastVocalEvent;
 
   @override
   void initState() {
@@ -163,9 +168,10 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     _spectralSweepEngine = SpectralSweepEngine(
       sampleRate: 48000.0,
       band: SweepBand.fm,
-      direction: SweepDirection.paused, // Spento di default, attivato a comando dall'utente
+      direction: SweepDirection.paused,
       sweepIntervalMs: 100,
     );
+    _vocalTriggerEngine = VocalTriggerEngine(isEnabled: false);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadHwid();
@@ -331,42 +337,80 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
       List<double> buffer;
       if (_activeMode == AppOperatingMode.spectralSweep) {
-        // Scansione spettrale deterministica pilotata dai sensori reali
-        final frame = _spectralSweepEngine.processFrame(
-          now: DateTime.now(),
+        if (_spectralSweepEngine.direction != SweepDirection.paused) {
+          // Scansione spettrale deterministica pilotata dai sensori reali
+          final frame = _spectralSweepEngine.processFrame(
+            now: DateTime.now(),
+            deltaEmf: deltaEmf,
+            zScoreEmf: zScore,
+            dynamicAccel: _currentDynamicVib,
+            bufferSize: 512,
+          );
+          _lastSweepFrame = frame;
+          buffer = frame.audioBuffer;
+
+          if (_isSweepAudioActive) {
+            try {
+              final double basePitch = _spectralSweepEngine.band == SweepBand.fm
+                  ? 600.0 + ((_spectralSweepEngine.currentFrequency - 87.5) / (108.0 - 87.5)) * 1400.0
+                  : 400.0 + ((_spectralSweepEngine.currentFrequency - 530.0) / (1600.0 - 530.0)) * 1200.0;
+              final double effectivePitch = (basePitch + (deltaEmf * 12.0)).clamp(200.0, 3000.0);
+              // Aggiorna parametri DSP caotico nel thread nativo (Android/iOS)
+              _audioChannel.invokeMethod('updateStaticParams', {
+                'emfDelta': deltaEmf,
+                'accel': _currentDynamicVib,
+                'zScore': zScore,
+                'pitchHz': effectivePitch,
+              });
+            } catch (_) {}
+          }
+        } else {
+          // Sweep in pausa: nessun calcolo pesante né audio nativo
+          buffer = List<double>.filled(512, 0.0);
+        }
+      } else {
+        // Metrology Pro: calcoli attivi solo se il monitoraggio è abilitato dall'utente
+        if (_isMetrologyMonitoringActive) {
+          buffer = List<double>.generate(512, (i) {
+            final t = i / 48000.0;
+            final baseNoise = (Random().nextDouble() - 0.5) * 0.002;
+            final anomalySig = (_lastTriggerResult?.isAnomaly ?? false)
+                ? sin(2.0 * pi * 1420.0 * t) * 0.15
+                : 0.0;
+            return _dspChain.process(baseNoise + anomalySig);
+          });
+        } else {
+          // Metrology in standby: buffer piatto, nessun carico DSP né audio
+          buffer = List<double>.filled(512, 0.0);
+        }
+      }
+
+      // ── Modulo Vocale Custom Real-Trigger (Completamente Isolato) ──
+      // Attivo SOLO se esplicitamente abilitato dall'utente E il modulo attivo non è in pausa
+      final bool isSystemRunning = _isMetrologyMonitoringActive ||
+          (_activeMode == AppOperatingMode.spectralSweep && _spectralSweepEngine.direction != SweepDirection.paused);
+
+      if (_vocalTriggerEngine.isEnabled && isSystemRunning) {
+        final now = DateTime.now();
+        final vocalEvent = _vocalTriggerEngine.evaluate(
+          now: now,
           deltaEmf: deltaEmf,
           zScoreEmf: zScore,
           dynamicAccel: _currentDynamicVib,
-          bufferSize: 512,
+          lorenzX: _spectralSweepEngine.lorenzX,
+          currentFrequency: _spectralSweepEngine.currentFrequency,
         );
-        _lastSweepFrame = frame;
-        buffer = frame.audioBuffer;
 
-        if (_isSweepAudioActive) {
+        if (vocalEvent != null) {
           try {
-            final double basePitch = _spectralSweepEngine.band == SweepBand.fm
-                ? 600.0 + ((_spectralSweepEngine.currentFrequency - 87.5) / (108.0 - 87.5)) * 1400.0
-                : 400.0 + ((_spectralSweepEngine.currentFrequency - 530.0) / (1600.0 - 530.0)) * 1200.0;
-            final double effectivePitch = (basePitch + (deltaEmf * 12.0)).clamp(200.0, 3000.0);
-            // Aggiorna parametri DSP caotico nel thread nativo (Android/iOS)
-            _audioChannel.invokeMethod('updateStaticParams', {
-              'emfDelta': deltaEmf,
-              'accel': _currentDynamicVib,
-              'zScore': zScore,
-              'pitchHz': effectivePitch,
+            _audioChannel.invokeMethod('speak', {
+              'text': vocalEvent.word,
+              'volume': 1.0,
+              'pitch': 0.85,
             });
           } catch (_) {}
+          _lastVocalEvent = vocalEvent;
         }
-      } else {
-        // Generazione metrologica standard
-        buffer = List<double>.generate(512, (i) {
-          final t = i / 48000.0;
-          final baseNoise = (Random().nextDouble() - 0.5) * 0.002;
-          final anomalySig = (_lastTriggerResult?.isAnomaly ?? false)
-              ? sin(2.0 * pi * 1420.0 * t) * 0.15
-              : 0.0;
-          return _dspChain.process(baseNoise + anomalySig);
-        });
       }
 
       final fftResult = _fftEngine.analyze(buffer);
@@ -500,7 +544,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
             SizedBox(width: 8),
             Text(
-              'AETHERSCAN-PRO v27-beta2.5',
+              'AETHERSCAN-PRO v27-beta2.6',
               style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ],
@@ -535,7 +579,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Specifiche Release v27-beta2.5 (Build 2.0.27+7):',
+              'Specifiche Release v27-beta2.6 (Build 2.0.27+8):',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
             ),
             const SizedBox(height: 6),
@@ -615,7 +659,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             : (androidUrl ?? defaultUrl);
 
         if (!mounted) return;
-        if (latest.isNotEmpty && latest != 'v27-beta2.5') {
+        if (latest.isNotEmpty && latest != 'v27-beta2.6') {
           _showUpdateResultDialog(
             isNewAvailable: true,
             version: latest,
@@ -626,7 +670,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         } else {
           _showUpdateResultDialog(
             isNewAvailable: false,
-            version: latest.isNotEmpty ? latest : 'v27-beta2.5',
+            version: latest.isNotEmpty ? latest : 'v27-beta2.6',
             message: 'Sei all\'ultima versione disponibile. Tutti i moduli scientifici sono aggiornati.',
           );
           return;
@@ -635,7 +679,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     } catch (_) {}
 
     if (mounted) {
-      _showToast('Sei all\'ultima versione disponibile: v27-beta2.5');
+      _showToast('Sei all\'ultima versione disponibile: v27-beta2.6');
     }
   }
 
@@ -786,7 +830,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.5 • SCIENTIFIC METROLOGY',
+                  'v27-beta2.6 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -895,9 +939,47 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ),
           const Divider(color: IndustrialPalette.border),
           ListTile(
+            leading: Icon(
+              _vocalTriggerEngine.isEnabled ? Icons.record_voice_over : Icons.voice_over_off,
+              color: _vocalTriggerEngine.isEnabled ? IndustrialPalette.phosphorGreen : IndustrialPalette.textMuted,
+              size: 20,
+            ),
+            title: const Text('Modulo Vocale Real-Trigger', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              _vocalTriggerEngine.isEnabled ? 'ATTIVO • Risonanza lessicale (|Z| >= 3.0σ)' : 'SPENTO (Standby)',
+              style: TextStyle(
+                fontSize: 9.5,
+                color: _vocalTriggerEngine.isEnabled ? IndustrialPalette.phosphorGreen : IndustrialPalette.textMuted,
+              ),
+            ),
+            trailing: Switch(
+              value: _vocalTriggerEngine.isEnabled,
+              activeColor: IndustrialPalette.phosphorGreen,
+              onChanged: (val) {
+                setState(() {
+                  _vocalTriggerEngine.setEnabled(val);
+                });
+                Navigator.pop(context);
+                _showToast(val
+                    ? 'Modulo Vocale Real-Trigger ABILITATO'
+                    : 'Modulo Vocale DISABILITATO (Standby)');
+              },
+            ),
+            onTap: () {
+              setState(() {
+                _vocalTriggerEngine.setEnabled(!_vocalTriggerEngine.isEnabled);
+              });
+              Navigator.pop(context);
+              _showToast(_vocalTriggerEngine.isEnabled
+                  ? 'Modulo Vocale Real-Trigger ABILITATO'
+                  : 'Modulo Vocale DISABILITATO (Standby)');
+            },
+          ),
+          const Divider(color: IndustrialPalette.border),
+          ListTile(
             leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
             title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-            subtitle: const Text('v27-beta2.5 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            subtitle: const Text('v27-beta2.6 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
             onTap: () {
               Navigator.pop(context);
               _showVersionInfoDialog();
@@ -967,8 +1049,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                   ),
                   Text(
                     _activeMode == AppOperatingMode.metrologyPro
-                        ? 'v27-beta2.5 • METROLOGY'
-                        : 'v27-beta2.5 • SWEEP',
+                        ? 'v27-beta2.6 • METROLOGY'
+                        : 'v27-beta2.6 • SWEEP',
                     style: TextStyle(
                       fontSize: 8,
                       color: _activeMode == AppOperatingMode.metrologyPro
@@ -1028,6 +1110,24 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
               ),
             ),
+          ),
+          IconButton(
+            icon: Icon(
+              _vocalTriggerEngine.isEnabled ? Icons.record_voice_over : Icons.voice_over_off,
+              color: _vocalTriggerEngine.isEnabled ? IndustrialPalette.phosphorGreen : IndustrialPalette.textMuted,
+              size: 20,
+            ),
+            tooltip: _vocalTriggerEngine.isEnabled
+                ? 'Modulo Vocale: ATTIVO'
+                : 'Modulo Vocale: SPENTO (Tocca per abilitare)',
+            onPressed: () {
+              setState(() {
+                _vocalTriggerEngine.setEnabled(!_vocalTriggerEngine.isEnabled);
+              });
+              _showToast(_vocalTriggerEngine.isEnabled
+                  ? 'Modulo Vocale Real-Trigger ABILITATO'
+                  : 'Modulo Vocale DISABILITATO (Standby)');
+            },
           ),
           IconButton(
             icon: const Icon(Icons.tune, color: IndustrialPalette.alertAmber, size: 20),
@@ -1172,6 +1272,51 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               ],
             ),
           ),
+
+          // ── Pillola HUD: Modulo Vocale Custom Real-Trigger ──
+          if (_vocalTriggerEngine.isEnabled)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: IndustrialPalette.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _lastVocalEvent != null
+                      ? IndustrialPalette.phosphorGreen
+                      : IndustrialPalette.textMuted.withValues(alpha: 0.4),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.record_voice_over,
+                    size: 14,
+                    color: _lastVocalEvent != null
+                        ? IndustrialPalette.phosphorGreen
+                        : IndustrialPalette.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _lastVocalEvent != null
+                          ? 'VOCAL ECHO: "${_lastVocalEvent!.word}" (Z=${_lastVocalEvent!.zScore.toStringAsFixed(1)} | Δ=${_lastVocalEvent!.deltaEmf.toStringAsFixed(1)}µT)'
+                          : 'VOCAL TRIGGER: IN ASCOLTO (Soglia |Z| >= 3.0σ)',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        color: _lastVocalEvent != null
+                            ? IndustrialPalette.textWhite
+                            : IndustrialPalette.textMuted,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // ── 1. Telemetry Cards Row ──
           Row(

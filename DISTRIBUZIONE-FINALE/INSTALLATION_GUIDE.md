@@ -1,31 +1,28 @@
-# AetherScan-Pro v27-beta2.5 (Build 2.0.27+7) — Guida di Installazione
+# AetherScan-Pro v27-beta2.6 (Build 2.0.27+8) — Guida di Installazione
 
 ## Panoramica della Release
-- **Versione:** `v27-beta2.5`
-- **Build:** `2.0.27+7`
+- **Versione:** `v27-beta2.6`
+- **Build:** `2.0.27+8`
 - **Novità e Risoluzioni:**
-  1. **Evoluzione Motore DSP Audio (AM/FM Spectral Sweep Reale e Organico):**
-     - **Eliminazione Rumore Piatto:** Abolito qualsiasi loop statico o rumore bianco ripetitivo.
-     - **Oscillatore Caotico di Lorenz (RK4):** Sintesi fisica continua basata sul sistema attrattore di Lorenz ($\sigma=10, \rho=28, \beta=8/3$) con Runge-Kutta al 4° ordine campione-per-campione, senza generatori pseudo-casuali (PRNG) né campioni preregistrati.
-     - **Modulazione Caotica Eterodina (EMF + Accelerometro):** La deviazione magnetica $\Delta\text{EMF}$ perturba direttamente la divergenza $\rho$ e produce uno shift di frequenza eterodina, mentre le sollecitazioni dell'accelerometro introducono tremolo d'ampiezza non lineare.
-     - **Filtraggio Dinamico Passabanda IIR Biquad (Squelch Reale):** Frequenza di taglio ($200 - 3000\text{ Hz}$) e risonanza $Q$ ($0.5 - 8.0$) inseguono in tempo reale l'energia ambientale misurata dai sensori, simulando la sintonizzazione spettrale eterea.
-  2. **Accelerometro Reale iPhone in m/s²:** Flusso continuo in unità metriche standard CoreMotion $\text{m/s}^2$ uniforme ad Android.
-  3. **Feedback Acustico Urto Fisico:** Ogni colpo o urto sul telaio ($|A_{\text{dyn}}| \ge 3.2\text{ m/s}^2$) genera feedback acustico immediato e indicatore visivo `URTO RILEVATO`.
-  4. **Aggiornamento Diretto Senza Cavo (OTA):** Dal popup "VERIFICA AGGIORNAMENTI", se è presente una nuova release, compare il tasto **SCARICA ORA** che apre Safari su iPhone per scaricare l'IPA e installarlo via AltStore / Scarlet / TrollStore senza cavo USB.
-  5. **Doppio Trigger Concomitante:** L'allarme acustico forense scatta solo con la coincidenza simultanea di urto fisico e anomalia statistica ($Z \ge 3.5\sigma$).
+  1. **Modulo Vocale Custom "Real-Trigger" (Zero-AI, Zero-Random, Zero-Server):**
+     - **Attivazione Energetica Reale:** Modulo spento di default. Si attiva ed emette parole unicamente quando i sensori superano le soglie metrologiche ($|Z| \ge 3.0\sigma$, $|\Delta\text{EMF}| \ge 1.5\,\mu\text{T}$) e persistono per almeno $150\text{ ms}$.
+     - **Risonanza Lessicale Deterministica:** Nessun campionamento casuale. L'indice del dizionario italiano di 128 termini fisici è calcolato via Spatial Energy Hash delle grandezze reali ($Z$, $\Delta\text{EMF}$, $L_x$, frequenza).
+     - **Sintesi Vocale Offline Nativa:** Audio TTS istantaneo e a consumo zero risorse tramite `AVSpeechSynthesizer` (iOS) e `android.speech.tts.TextToSpeech` (Android).
+     - **Pillola HUD & Controlli:** Switch nel Drawer e pulsante rapido nell'AppBar per attivazione/disattivazione, con badge visivo `VOCAL ECHO` in verde fosforo.
+  2. **Isolamento Totale dei Moduli:** Nessun loop residuo né audio spurio se i moduli (Sweep o Metrology) sono in pausa o standby.
+  3. **Motore DSP Caotico di Lorenz (RK4):** AM/FM Sweep organico e non ripetitivo.
+  4. **Aggiornamento Diretto Senza Cavo (OTA):** Dal popup "VERIFICA AGGIORNAMENTI", tocca **SCARICA ORA** per scaricare direttamente l'IPA/APK da Safari/browser.
 
 ---
 
 ## 1. Installazione Android (.apk)
-File: `AetherScan-Pro-v27-beta2.5-Metrology.apk`
-- Trasferisci o scarica l'APK sul dispositivo.
-- Tocca il file APK per installare/aggiornare.
+File: `AetherScan-Pro-v27-beta2.6-Metrology.apk`
+- Trasferisci o scarica l'APK sul dispositivo Android e aprilo per installare.
 
 ---
 
-## 2. Installazione iOS Senza Cavo (.ipa)
+## 2. Installazione iOS (.ipa)
 1. Apri AetherScan-Pro su iPhone.
-2. Apri il Drawer laterale e tocca **INFO E AGGIORNAMENTI**.
-3. Tocca **VERIFICA AGGIORNAMENTI**.
-4. Tocca il tasto verde **SCARICA ORA**: si aprirà Safari con il download diretto dell'IPA.
-5. In Safari, tocca il file scaricato > **Condividi** > **AltStore** (o Scarlet / TrollStore / Sideloadly) per aggiornare direttamente sul dispositivo.
+2. Dal Drawer tocca **INFO E AGGIORNAMENTI** > **VERIFICA AGGIORNAMENTI**.
+3. Tocca il tasto verde **SCARICA ORA**: si aprirà Safari con il download diretto dell'IPA.
+4. In Safari, tocca il file scaricato > **Condividi** > **AltStore** (o Scarlet / TrollStore / Sideloadly con cavo) per aggiornare direttamente sul dispositivo.

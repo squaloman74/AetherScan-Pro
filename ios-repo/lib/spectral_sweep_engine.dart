@@ -96,6 +96,7 @@ class SpectralSweepEngine {
   }) : _currentFreq = band == SweepBand.fm ? fmMinMhz : amMinKhz;
 
   double get currentFrequency => _currentFreq;
+  double get lorenzX => _lx;
 
   void setBand(SweepBand newBand) {
     if (band == newBand) return;
