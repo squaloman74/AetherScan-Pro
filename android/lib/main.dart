@@ -38,7 +38,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.6 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta2.8 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -618,7 +618,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
             SizedBox(width: 8),
             Text(
-              'AETHERSCAN-PRO v27-beta2.6',
+              'AETHERSCAN-PRO v27-beta2.8',
               style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ],
@@ -653,7 +653,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Specifiche Release v27-beta2.6 (Build 2.0.27+8):',
+              'Specifiche Release v27-beta2.8 (Build 2.0.28+279):',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
             ),
             const SizedBox(height: 6),
@@ -733,7 +733,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             : (androidUrl ?? defaultUrl);
 
         if (!mounted) return;
-        if (latest.isNotEmpty && latest != 'v27-beta2.6') {
+        if (latest.isNotEmpty && latest != 'v27-beta2.8') {
           _showUpdateResultDialog(
             isNewAvailable: true,
             version: latest,
@@ -744,7 +744,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         } else {
           _showUpdateResultDialog(
             isNewAvailable: false,
-            version: latest.isNotEmpty ? latest : 'v27-beta2.6',
+            version: latest.isNotEmpty ? latest : 'v27-beta2.8',
             message: 'Sei all\'ultima versione disponibile. Tutti i moduli scientifici sono aggiornati.',
           );
           return;
@@ -753,7 +753,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     } catch (_) {}
 
     if (mounted) {
-      _showToast('Sei all\'ultima versione disponibile: v27-beta2.6');
+      _showToast('Sei all\'ultima versione disponibile: v27-beta2.8');
     }
   }
 
@@ -904,7 +904,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.6 • SCIENTIFIC METROLOGY',
+                  'v27-beta2.8 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -1067,7 +1067,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ListTile(
             leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
             title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-            subtitle: const Text('v27-beta2.6 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            subtitle: const Text('v27-beta2.8 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
             onTap: () {
               Navigator.pop(context);
               _showVersionInfoDialog();
@@ -1137,8 +1137,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                   ),
                   Text(
                     _activeMode == AppOperatingMode.metrologyPro
-                        ? 'v27-beta2.6 • METROLOGY'
-                        : 'v27-beta2.6 • SWEEP',
+                        ? 'v27-beta2.8 • METROLOGY'
+                        : 'v27-beta2.8 • SWEEP',
                     style: TextStyle(
                       fontSize: 8,
                       color: _activeMode == AppOperatingMode.metrologyPro
@@ -1636,3 +1636,4 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
   }
 }
+
