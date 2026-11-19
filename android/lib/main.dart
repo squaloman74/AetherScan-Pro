@@ -215,7 +215,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     final taredProfile = _baselineEngine.applyQuickTare(_currentEmf);
     _triggerEngine.setBaseline(taredProfile);
     setState(() {});
-    _showToast('TARA RAPIDA applicata: \${_currentEmf.toStringAsFixed(1)} µT → nuovo riferimento EMF');
+    _showToast('TARA RAPIDA applicata: ${_currentEmf.toStringAsFixed(1)} µT → nuovo riferimento EMF');
   }
 
   void _startCalibration() {
