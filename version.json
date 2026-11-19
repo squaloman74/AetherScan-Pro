@@ -1,10 +1,10 @@
 {
-    "android_download_url":  "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.6/AetherScan-Pro-v27-beta2.6-Metrology.apk",
-    "download_url":  "https://github.com/squaloman74/AetherScan-Pro/releases/tag/v27-beta2.6",
-    "ios_download_url":  "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.6/AetherScan-Pro-v27-beta2.6-Metrology-unsigned.ipa",
-    "release_title":  "AetherScan-Pro v27-beta2.6 Metrology Suite",
-    "build_number":  278,
-    "release_date":  "2026-11-18",
-    "notes":  "Modulo Vocale Custom Real-Trigger (Zero-AI, Zero-Random, Zero-Server): risonanza lessicale deterministica attivata solo su anomalia energetica reale (|Z| \u003e= 3.0s, persistenza \u003e= 150ms) con sintesi TTS nativa offline (Android/iOS). Blindatura e isolamento completo dei motori in standby.",
-    "latest_version":  "v27-beta2.6"
+  "android_download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.8/AetherScan-Pro-v27-beta2.8-Metrology.apk",
+  "download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/tag/v27-beta2.8",
+  "ios_download_url": "https://github.com/squaloman74/AetherScan-Pro/releases/download/v27-beta2.8/AetherScan-Pro-v27-beta2.8-Metrology.ipa",
+  "release_title": "AetherScan-Pro v27-beta2.8 Metrology Suite",
+  "build_number": 279,
+  "release_date": "2026-11-19",
+  "notes": "Modulo Vocale Custom Real-Trigger (Zero-AI, Zero-Random, Zero-Server): risonanza lessicale deterministica attivata solo su anomalia energetica reale (|Z| >= 3.0s, persistenza >= 150ms) con sintesi TTS nativa offline (Android/iOS). Blindatura e isolamento completo dei motori in standby.",
+  "latest_version": "v27-beta2.8"
 }
