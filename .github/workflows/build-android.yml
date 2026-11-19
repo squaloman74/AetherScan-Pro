@@ -1,4 +1,4 @@
-name: Build AetherScan Pro Android (APK) - v27-beta2.8 Metrology
+name: Build AetherScan Pro Android (APK) - v27-beta3.0
 
 on:
   push:
@@ -37,16 +37,16 @@ jobs:
 
       - name: Build APK (Release)
         working-directory: android
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Rename and Package APK
         working-directory: android
         run: |
           mkdir -p release-android
-          cp build/app/outputs/flutter-apk/app-release.apk release-android/AetherScan-Pro-v27-beta2.8-Metrology.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-android/AetherScan-Pro-v27-beta3.0-release.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AetherScan-Pro-v27-beta2.8-Android-APK
+          name: AetherScan-Pro-v27-beta3.0-Android-APK
           path: android/release-android/*.apk

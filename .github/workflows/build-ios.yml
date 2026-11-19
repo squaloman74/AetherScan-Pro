@@ -1,4 +1,4 @@
-name: Build AetherScan Pro iOS (IPA) - v27-beta2.8 Metrology
+name: Build AetherScan Pro iOS (IPA) - v27-beta3.0
 
 on:
   push:
@@ -39,25 +39,29 @@ jobs:
         run: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r AetherScan-Pro-v27-beta2.8-Metrology-unsigned.ipa Payload
+          zip -r AetherScan-Pro-v27-beta3.0-unsigned.ipa Payload
           mkdir -p release-ios
-          mv AetherScan-Pro-v27-beta2.8-Metrology-unsigned.ipa release-ios/
+          mv AetherScan-Pro-v27-beta3.0-unsigned.ipa release-ios/
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AetherScan-Pro-v27-beta2.8-iOS-IPA
+          name: AetherScan-Pro-v27-beta3.0-iOS-IPA
           path: ios-repo/release-ios/*.ipa
 
-      - name: Create GitHub Release with v27-beta2.8 IPA
+      - name: Create GitHub Release with v27-beta3.0 IPA
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v27-beta2.8
-          name: "AetherScan Pro v27-beta2.8 Metrology - iOS (IPA Unsigned)"
+          tag_name: v27-beta3.0
+          name: "AetherScan Pro v27-beta3.0 — Release iOS (IPA Unsigned)"
           body: |
-            ## AetherScan Pro v2.0 (v27-beta2.8, Build 279) — Release iOS
+            ## AetherScan Pro v2.0.30 (v27-beta3.0, Build 300) — Release iOS
             **Data build:** 19/11/2026
-            Pacchetto IPA non firmato generato da `ios-repo` allineato a `v27-beta2.8` (K2 Field Meter `deltaEmf.abs()`, `TARA RAPIDA` con valore numerico e modulo Vocale Custom Real-Trigger).
+            Pacchetto IPA non firmato reale generato su macOS via Xcode da `ios-repo/` allineato a `v27-beta3.0`:
+            - K2 Field Meter con auto-tara e refresh continuo dei sensori
+            - Curva volume logaritmica + Noise Gate
+            - Fingerprinting deterministico SHA-256
+            - 90/90 Unit & Widget Tests PASS
           files: ios-repo/release-ios/*.ipa
           draft: false
           prerelease: false
