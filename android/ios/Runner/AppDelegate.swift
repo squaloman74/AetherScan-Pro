@@ -341,13 +341,13 @@ import CoreMotion
         let field = motion.magneticField.field
         let magnitude = sqrt(field.x*field.x + field.y*field.y + field.z*field.z)
         if magnitude > 0 {
-          if (self?.emfBaseline ?? -1) < 0 {
-            self?.emfBaseline = magnitude
+          if self.emfBaseline < 0 {
+            self.emfBaseline = magnitude
           }
-          let delta = abs(magnitude - (self?.emfBaseline ?? magnitude))
+          let delta = abs(magnitude - self.emfBaseline)
           let isSpike = delta > 25.0
           DispatchQueue.main.async {
-            self?.sensorEventSink?(["type": "emf", "value": magnitude, "delta": delta, "spike": isSpike])
+            self.sensorEventSink?(["type": "emf", "value": magnitude, "delta": delta, "spike": isSpike])
           }
         }
       }
