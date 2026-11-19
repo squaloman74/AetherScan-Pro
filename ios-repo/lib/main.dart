@@ -16,6 +16,7 @@ import 'industrial_ui.dart';
 import 'spectral_sweep_engine.dart';
 import 'spectral_sweep_view.dart';
 import 'vocal_trigger_engine.dart';
+import 'k2_led_bar.dart';
 
 /// Modalità operative selezionabili dal Menu Hamburger
 enum AppOperatingMode {
@@ -97,6 +98,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   late final SpectralSweepEngine _spectralSweepEngine;
   SweepFrame? _lastSweepFrame;
   bool _isSweepAudioActive = false;
+  double _masterVolume = 0.85;
   bool _isMetrologyMonitoringActive = false; // Spento di default, attivato a comando dall'utente
 
   // ── Modulo Vocale Custom Real-Trigger (Completamente Isolato) ──
@@ -209,6 +211,13 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     }
   }
 
+  void _applyQuickTare() {
+    final taredProfile = _baselineEngine.applyQuickTare(_currentEmf);
+    _triggerEngine.setBaseline(taredProfile);
+    setState(() {});
+    _showToast('TARA RAPIDA applicata: \${_currentEmf.toStringAsFixed(1)} µT → nuovo riferimento EMF');
+  }
+
   void _startCalibration() {
     setState(() {
       _isCalibrating = true;
@@ -237,7 +246,9 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             final p = (map['value'] as num?)?.toDouble() ?? 1013.25;
             _handlePressureSample(p);
           } else if (type == 'touch') {
-            _handleAccelSample(3.5); // Bump manuale
+            // Evento tocco fisico confermato da bridge nativo (cooldown 2.0s, soglia 3.2 m/s²).
+            // L'accelerazione dinamica reale è già convogliata dal frame 'accel'.
+            // Nessuna iniezione di bump sintetico per evitare duplicazione di trigger.
           }
         },
         onError: (_) {},
@@ -336,34 +347,40 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       final zScore = _lastTriggerResult?.zScoreEmf ?? 0.0;
 
       List<double> buffer;
-      if (_activeMode == AppOperatingMode.spectralSweep) {
-        if (_spectralSweepEngine.direction != SweepDirection.paused) {
-          // Scansione spettrale deterministica pilotata dai sensori reali
-          final frame = _spectralSweepEngine.processFrame(
-            now: DateTime.now(),
-            deltaEmf: deltaEmf,
-            zScoreEmf: zScore,
-            dynamicAccel: _currentDynamicVib,
-            bufferSize: 512,
-          );
-          _lastSweepFrame = frame;
-          buffer = frame.audioBuffer;
+      final bool isSweepRunning = _spectralSweepEngine.direction != SweepDirection.paused;
 
-          if (_isSweepAudioActive) {
-            try {
-              final double basePitch = _spectralSweepEngine.band == SweepBand.fm
-                  ? 600.0 + ((_spectralSweepEngine.currentFrequency - 87.5) / (108.0 - 87.5)) * 1400.0
-                  : 400.0 + ((_spectralSweepEngine.currentFrequency - 530.0) / (1600.0 - 530.0)) * 1200.0;
-              final double effectivePitch = (basePitch + (deltaEmf * 12.0)).clamp(200.0, 3000.0);
-              // Aggiorna parametri DSP caotico nel thread nativo (Android/iOS)
-              _audioChannel.invokeMethod('updateStaticParams', {
-                'emfDelta': deltaEmf,
-                'accel': _currentDynamicVib,
-                'zScore': zScore,
-                'pitchHz': effectivePitch,
-              });
-            } catch (_) {}
-          }
+      if (isSweepRunning) {
+        // Scansione spettrale deterministica pilotata dai sensori reali
+        final frame = _spectralSweepEngine.processFrame(
+          now: DateTime.now(),
+          deltaEmf: deltaEmf,
+          zScoreEmf: zScore,
+          dynamicAccel: _currentDynamicVib,
+          bufferSize: 512,
+        );
+        _lastSweepFrame = frame;
+
+        if (_isSweepAudioActive) {
+          try {
+            final double basePitch = _spectralSweepEngine.band == SweepBand.fm
+                ? 600.0 + ((_spectralSweepEngine.currentFrequency - 87.5) / (108.0 - 87.5)) * 1400.0
+                : 400.0 + ((_spectralSweepEngine.currentFrequency - 530.0) / (1600.0 - 530.0)) * 1200.0;
+            final double effectivePitch = (basePitch + (deltaEmf * 12.0)).clamp(200.0, 3000.0);
+            // Aggiorna parametri DSP caotico nel thread nativo (Android/iOS) con volume master reale
+            _audioChannel.invokeMethod('updateStaticParams', {
+              'emfDelta': deltaEmf,
+              'accel': _currentDynamicVib,
+              'zScore': zScore,
+              'pitchHz': effectivePitch,
+              'volume': _masterVolume,
+            });
+          } catch (_) {}
+        }
+      }
+
+      if (_activeMode == AppOperatingMode.spectralSweep) {
+        if (isSweepRunning && _lastSweepFrame != null) {
+          buffer = _lastSweepFrame!.audioBuffer;
         } else {
           // Sweep in pausa: nessun calcolo pesante né audio nativo
           buffer = List<double>.filled(512, 0.0);
@@ -386,9 +403,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       }
 
       // ── Modulo Vocale Custom Real-Trigger (Completamente Isolato) ──
-      // Attivo SOLO se esplicitamente abilitato dall'utente E il modulo attivo non è in pausa
-      final bool isSystemRunning = _isMetrologyMonitoringActive ||
-          (_activeMode == AppOperatingMode.spectralSweep && _spectralSweepEngine.direction != SweepDirection.paused);
+      // Attivo se abilitato dall'utente E almeno uno dei moduli (Metrologia o Sweep) è in esecuzione
+      final bool isSystemRunning = _isMetrologyMonitoringActive || isSweepRunning;
 
       if (_vocalTriggerEngine.isEnabled && isSystemRunning) {
         final now = DateTime.now();
@@ -405,7 +421,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           try {
             _audioChannel.invokeMethod('speak', {
               'text': vocalEvent.word,
-              'volume': 1.0,
+              'volume': _masterVolume,
               'pitch': 0.85,
             });
           } catch (_) {}
@@ -429,11 +445,20 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     } catch (_) {}
   }
 
+  void _setMasterVolume(double vol) {
+    setState(() {
+      _masterVolume = vol.clamp(0.0, 1.0);
+    });
+    try {
+      _audioChannel.invokeMethod('setVolume', {'volume': _masterVolume});
+    } catch (_) {}
+  }
+
   void _startSweepAudio() {
     if (_isSweepAudioActive) return;
     _isSweepAudioActive = true;
     try {
-      _audioChannel.invokeMethod('startStatic');
+      _audioChannel.invokeMethod('startStatic', {'volume': _masterVolume});
     } catch (_) {}
   }
 
@@ -443,6 +468,55 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     try {
       _audioChannel.invokeMethod('stopStatic');
     } catch (_) {}
+  }
+
+  void _showVolumeDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: IndustrialPalette.surface,
+          title: const Row(
+            children: [
+              Icon(Icons.volume_up, color: IndustrialPalette.phosphorCyan, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'REGOLAZIONE VOLUME',
+                style: TextStyle(fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Livello Master: ' + (_masterVolume * 100).round().toString() + '%',
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: IndustrialPalette.textWhite),
+              ),
+              const SizedBox(height: 12),
+              Slider(
+                value: _masterVolume.clamp(0.0, 1.0),
+                min: 0.0,
+                max: 1.0,
+                divisions: 20,
+                activeColor: IndustrialPalette.phosphorCyan,
+                inactiveColor: IndustrialPalette.border,
+                onChanged: (val) {
+                  setDlgState(() {});
+                  _setMasterVolume(val);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CHIUDI', style: TextStyle(fontFamily: 'monospace', color: IndustrialPalette.phosphorCyan)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showToast(String msg) {
@@ -881,7 +955,6 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             selected: _activeMode == AppOperatingMode.metrologyPro,
             selectedTileColor: IndustrialPalette.surfaceLight,
             onTap: () {
-              _stopSweepAudio();
               setState(() => _activeMode = AppOperatingMode.metrologyPro);
               Navigator.pop(context);
             },
@@ -900,10 +973,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             selected: _activeMode == AppOperatingMode.spectralSweep,
             selectedTileColor: IndustrialPalette.surfaceLight,
             onTap: () {
-              _stopSweepAudio(); // Radio spenta all'accesso: l'utente preme AVVIA a comando
               setState(() {
                 _activeMode = AppOperatingMode.spectralSweep;
-                _spectralSweepEngine.setPaused(true);
               });
               Navigator.pop(context);
             },
@@ -973,6 +1044,23 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               _showToast(_vocalTriggerEngine.isEnabled
                   ? 'Modulo Vocale Real-Trigger ABILITATO'
                   : 'Modulo Vocale DISABILITATO (Standby)');
+            },
+          ),
+          const Divider(color: IndustrialPalette.border),
+          ListTile(
+            leading: Icon(
+              _masterVolume == 0.0 ? Icons.volume_off : (_masterVolume < 0.5 ? Icons.volume_down : Icons.volume_up),
+              color: IndustrialPalette.phosphorCyan,
+              size: 20,
+            ),
+            title: const Text('Volume Master Audio', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              'Livello: ' + (_masterVolume * 100).round().toString() + '% (TTS, Radio & Beep)',
+              style: const TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              _showVolumeDialog();
             },
           ),
           const Divider(color: IndustrialPalette.border),
@@ -1113,6 +1201,15 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ),
           IconButton(
             icon: Icon(
+              _masterVolume == 0.0 ? Icons.volume_off : (_masterVolume < 0.5 ? Icons.volume_down : Icons.volume_up),
+              color: IndustrialPalette.phosphorCyan,
+              size: 20,
+            ),
+            tooltip: 'Volume: ' + (_masterVolume * 100).round().toString() + '%',
+            onPressed: _showVolumeDialog,
+          ),
+          IconButton(
+            icon: Icon(
               _vocalTriggerEngine.isEnabled ? Icons.record_voice_over : Icons.voice_over_off,
               color: _vocalTriggerEngine.isEnabled ? IndustrialPalette.phosphorGreen : IndustrialPalette.textMuted,
               size: 20,
@@ -1163,9 +1260,11 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               currentDynamicAccel: _currentDynamicVib,
               fftDbfs: _currentFftDbfs,
               audioPeakHz: _audioPeakHz,
+              currentVolume: _masterVolume,
               onBandChanged: (b) => setState(() => _spectralSweepEngine.setBand(b)),
               onIntervalChanged: (ms) => setState(() => _spectralSweepEngine.setSweepInterval(ms)),
               onDirectionChanged: (dir) => setState(() => _spectralSweepEngine.setDirection(dir)),
+              onVolumeChanged: _setMasterVolume,
               onTogglePause: () {
                 setState(() {
                   final willBePaused = _spectralSweepEngine.direction != SweepDirection.paused;
@@ -1317,6 +1416,14 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ],
               ),
             ),
+
+                K2LedBarWidget(
+                  currentEmf: _currentEmf,
+                  deltaEmf: deltaEmf,
+                  zScore: zScore,
+                  onQuickTare: _applyQuickTare,
+                ),
+                const SizedBox(height: 8),
 
           // ── 1. Telemetry Cards Row ──
           Row(

@@ -121,6 +121,8 @@ class ForensicLogEntry {
   final double? audioPeakHz;
   final double? audioPeakDbfs;
   final String? mappedLemma;
+  final String fingerprint;
+  final int occurrenceCount;
 
   const ForensicLogEntry({
     required this.index,
@@ -137,6 +139,8 @@ class ForensicLogEntry {
     this.audioPeakHz,
     this.audioPeakDbfs,
     this.mappedLemma,
+    required this.fingerprint,
+    this.occurrenceCount = 1,
   });
 
   /// Riga CSV conforme a RFC 4180
@@ -181,6 +185,10 @@ class ForensicLogEntry {
         'peak_dbfs': audioPeakDbfs,
       },
       'lemma': mappedLemma,
+      'fingerprint': {
+        'hash': fingerprint,
+        'occurrence_count': occurrenceCount,
+      },
     };
   }
 }
@@ -191,6 +199,7 @@ class ForensicSessionLogger {
   final DateTime sessionStart;
   final BaselineProfile? baseline;
   final List<ForensicLogEntry> _entries = [];
+  final Map<String, int> _fingerprintCounts = {};
 
   ForensicSessionLogger({
     required this.sessionId,
@@ -205,6 +214,23 @@ class ForensicSessionLogger {
   int get artifactCount =>
       _entries.where((e) => e.classification == TriggerClassification.mechanicalTouch).length;
 
+  static String computeDeterministicFingerprint({
+    required TriggerClassification classification,
+    required double emfDelta,
+    required double dynamicAccel,
+    required bool isBump,
+    double? pressureHpa,
+    double? audioPeakHz,
+  }) {
+    final qEmf = (emfDelta * 10.0).round();
+    final qVib = (dynamicAccel * 100.0).round();
+    final qBaro = pressureHpa == null ? 'na' : (pressureHpa * 10.0).round().toString();
+    final qHz = audioPeakHz == null ? 'na' : audioPeakHz.round().toString();
+    final canonical = '${classification.name}|$qEmf|$qVib|${isBump ? 1 : 0}|$qBaro|$qHz';
+    final digest = Sha256.hashString(canonical);
+    return digest.substring(0, 16);
+  }
+
   /// Registra un nuovo evento di trigger deterministico nel ledger
   ForensicLogEntry logTrigger(
     TriggerResult result, {
@@ -213,6 +239,17 @@ class ForensicSessionLogger {
     double? audioPeakDbfs,
     String? lemma,
   }) {
+    final fp = computeDeterministicFingerprint(
+      classification: result.classification,
+      emfDelta: result.deltaEmf,
+      dynamicAccel: result.rawDynamicAccel,
+      isBump: result.isBumpDetected,
+      pressureHpa: pressureHpa,
+      audioPeakHz: audioPeakHz,
+    );
+    final nextCount = (_fingerprintCounts[fp] ?? 0) + 1;
+    _fingerprintCounts[fp] = nextCount;
+
     final entry = ForensicLogEntry(
       index: _entries.length + 1,
       timestamp: result.timestamp,
@@ -228,6 +265,8 @@ class ForensicSessionLogger {
       audioPeakHz: audioPeakHz,
       audioPeakDbfs: audioPeakDbfs,
       mappedLemma: lemma,
+      fingerprint: fp,
+      occurrenceCount: nextCount,
     );
 
     _entries.add(entry);

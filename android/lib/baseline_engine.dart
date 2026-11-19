@@ -228,6 +228,36 @@ class BaselineEngine {
     onCancelled?.call(reason);
   }
 
+  /// Esegue una tara rapida istantanea sul valore EMF corrente (Zero-Calibration),
+  /// aggiornando o impostando deterministicamente il riferimento di base senza attendere i 30 secondi.
+  BaselineProfile applyQuickTare(double currentEmfMagnitude, {double defaultStdDev = 1.0}) {
+    _countdownTimer?.cancel();
+    _status = CalibrationStatus.calibrated;
+    final now = DateTime.now();
+    final prev = _activeProfile;
+    final stdDev = (prev != null && prev.emfStdDev > 0) ? prev.emfStdDev : defaultStdDev;
+
+    _activeProfile = BaselineProfile(
+      calibratedAt: now,
+      duration: prev?.duration ?? Duration.zero,
+      totalSamples: (prev?.totalSamples ?? 0) + 1,
+      emfMean: currentEmfMagnitude,
+      emfStdDev: stdDev,
+      emfMin: prev != null ? min(prev.emfMin, currentEmfMagnitude) : currentEmfMagnitude,
+      emfMax: prev != null ? max(prev.emfMax, currentEmfMagnitude) : currentEmfMagnitude,
+      vibMean: prev?.vibMean ?? 0.04,
+      vibStdDev: prev?.vibStdDev ?? 0.01,
+      vibMax: prev?.vibMax ?? 0.10,
+      baroMean: prev?.baroMean ?? 1013.25,
+      baroStdDev: prev?.baroStdDev ?? 0.05,
+      baroMin: prev?.baroMin ?? 1013.25,
+      baroMax: prev?.baroMax ?? 1013.25,
+    );
+
+    onComplete?.call(_activeProfile!);
+    return _activeProfile!;
+  }
+
   /// Conclusione della calibrazione e generazione del profilo baseline
   void _finalizeCalibration() {
     _status = CalibrationStatus.calibrated;

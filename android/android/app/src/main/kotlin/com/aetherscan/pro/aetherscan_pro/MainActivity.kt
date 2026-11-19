@@ -40,6 +40,7 @@ class MainActivity : FlutterActivity(), SensorEventListener {
     private var creepyMediaPlayer: MediaPlayer? = null
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
+    private var masterVolume: Float = 0.85f
 
     // Sensori
     private lateinit var sensorManager: SensorManager
@@ -99,6 +100,11 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     updateStaticModulation(coupling.toFloat(), pitchHz.toFloat())
                     result.success(true)
                 }
+                "setVolume" -> {
+                    val vol = (call.argument<Double>("volume") ?: 0.85).toFloat()
+                    masterVolume = vol.coerceIn(0.0f, 1.0f)
+                    result.success(true)
+                }
                 "speak" -> {
                     val text = call.argument<String>("text") ?: ""
                     val vol = (call.argument<Double>("volume") ?: 1.0).toFloat()
@@ -119,11 +125,22 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     playCreepyLaughSound()
                     result.success(true)
                 }
-                "startStatic" -> { startRadioStatic(); result.success(true) }
+                "startStatic" -> {
+                    val vol = call.argument<Double>("volume")
+                    if (vol != null) {
+                        masterVolume = vol.toFloat().coerceIn(0.0f, 1.0f)
+                    }
+                    startRadioStatic()
+                    result.success(true)
+                }
                 "updateStaticParams" -> {
                     val dEmf   = call.argument<Double>("emfDelta") ?: 0.0
                     val accel  = call.argument<Double>("accel") ?: 0.0
                     val zScore = call.argument<Double>("zScore") ?: 0.0
+                    val vol    = call.argument<Double>("volume")
+                    if (vol != null) {
+                        masterVolume = vol.toFloat().coerceIn(0.0f, 1.0f)
+                    }
                     updateStaticChaosParams(dEmf, accel, zScore)
                     result.success(true)
                 }
@@ -286,8 +303,9 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
                 }
 
                 // Soglia tarata: 3.2 m/s² (sensibile al tocco/sfioramento, ma ignora oscillazioni lente della mano)
+                // Cooldown anti-rimbalzo allineato Android/iOS: 2.0 s (2000 ms)
                 val now = System.currentTimeMillis()
-                if (impulse > 3.2 && (now - lastTouchTriggerTime > 5000)) {
+                if (impulse > 3.2 && (now - lastTouchTriggerTime > 2000L)) {
                     lastTouchTriggerTime = now
                     runOnUiThread {
                         sensorEventSink?.success(mapOf(
@@ -338,7 +356,7 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
 
                 creepyMediaPlayer?.apply {
                     setAudioStreamType(AudioManager.STREAM_MUSIC)
-                    setVolume(1.0f, 1.0f)
+                    setVolume(masterVolume, masterVolume)
                     setOnCompletionListener { mp ->
                         mp.release()
                         creepyMediaPlayer = null
@@ -360,10 +378,11 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
                 val sampleRate = 22050
                 val numSamples = (sampleRate * (durationMs / 1000.0)).toInt()
                 val samples = ShortArray(numSamples)
+                val toneGain = if (masterVolume < 0.05f) 0.0 else (masterVolume * masterVolume).toDouble()
                 for (i in 0 until numSamples) {
                     val angle = 2.0 * Math.PI * i * freqHz / sampleRate
                     val env = 1.0 - (i.toDouble() / numSamples)
-                    samples[i] = (Math.sin(angle) * Short.MAX_VALUE * 0.4 * env).toInt().toShort()
+                    samples[i] = (Math.sin(angle) * Short.MAX_VALUE * 0.4 * env * toneGain).toInt().toShort()
                 }
                 val track = AudioTrack(
                     AudioManager.STREAM_MUSIC, sampleRate,
@@ -468,6 +487,7 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
                     val tremoloRateHz = (0.5 + kotlin.math.abs(accel) * 2.5).coerceIn(0.5, 6.0)
                     val tremoloDepth  = (0.15 + coupling * 0.45).coerceIn(0.15, 0.6)
 
+                    val effectiveGain = if (masterVolume < 0.05f) 0.0 else (masterVolume * masterVolume).toDouble()
                     for (i in buffer.indices) {
                         // 1. Oscillatore caotico logistic map
                         logX = rParam * logX * (1.0 - logX)
@@ -492,7 +512,7 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
                         bqX2 = bqX1; bqX1 = mixed
                         bqY2 = bqY1; bqY1 = filtered
 
-                        buffer[i] = (filtered * 22000.0).toInt().coerceIn(-32767, 32767).toShort()
+                        buffer[i] = (filtered * 22000.0 * effectiveGain).toInt().coerceIn(-32767, 32767).toShort()
                     }
                     staticTrack?.write(buffer, 0, buffer.size)
                 }
@@ -522,7 +542,8 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
             try {
                 tts?.setPitch(pitch)
                 val params = Bundle()
-                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, vol.coerceIn(0.1f, 1.0f))
+                val effectiveVol = (vol * masterVolume).coerceIn(0.0f, 1.0f)
+                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, effectiveVol)
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "AETHER_VOCAL_${System.currentTimeMillis()}")
             } catch (e: Exception) {
                 e.printStackTrace()

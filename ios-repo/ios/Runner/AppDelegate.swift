@@ -16,6 +16,7 @@ import CoreMotion
   private var staticPlayer      : AVAudioPlayer?
   private var isStaticPlaying   = false
   private var channelRegistered = false
+  private var masterVolume      : Float = 0.85
 
   // Sensori
   private let motionManager     = CMMotionManager()
@@ -29,6 +30,12 @@ import CoreMotion
   private var lastGravityY: Double = 0.0
   private var lastGravityZ: Double = -1.0
   private var lastTouchTriggerTime: TimeInterval = 0
+
+  private func scaledMasterGain() -> Float {
+    if self.masterVolume < 0.05 { return 0.0 }
+    let v = Double(self.masterVolume)
+    return Float(max(0.0, min(1.0, v * v)))
+  }
 
   private func log(_ msg: String) { NSLog("[AETHER] %@", msg) }
 
@@ -105,13 +112,20 @@ import CoreMotion
         self.log("saveLicense -> \(k.count) chars salvati")
         result(true)
 
+      case "setVolume":
+        let vol = (call.arguments as? [String: Any])?["volume"] as? Double ?? 0.85
+        self.masterVolume = Float(max(0.0, min(1.0, vol)))
+        self.staticAudioEngine?.mainMixerNode.outputVolume = self.scaledMasterGain()
+        result(true)
+
       case "speak":
         let args = call.arguments as? [String: Any]
         let text   = args?["text"] as? String ?? ""
         let vol    = (args?["volume"] as? Double).map { Float($0) } ?? 1.0
         let gender = args?["gender"] as? String ?? "female"
-        self.log("speak -> \"\(text)\" gender=\(gender)")
-        self.speak(text: text, vol: vol, gender: gender)
+        let effectiveVol = max(0.0, min(1.0, vol * self.masterVolume))
+        self.log("speak -> \"\(text)\" gender=\(gender) vol=\(effectiveVol)")
+        self.speak(text: text, vol: effectiveVol, gender: gender)
         result(true)
 
       case "playBeep":
@@ -152,6 +166,9 @@ import CoreMotion
         result(self.buildDiagnostic())
 
       case "startStatic":
+        if let vol = (call.arguments as? [String: Any])?["volume"] as? Double {
+          self.masterVolume = Float(max(0.0, min(1.0, vol)))
+        }
         self.startRadioStatic()
         result(true)
 
@@ -165,6 +182,10 @@ import CoreMotion
         let accel    = args?["accel"]    as? Double ?? 0.0
         let zScore   = args?["zScore"]   as? Double ?? 0.0
         let pitchHz  = args?["pitchHz"]  as? Double ?? 800.0
+        if let vol = args?["volume"] as? Double {
+          self.masterVolume = Float(max(0.0, min(1.0, vol)))
+          self.staticAudioEngine?.mainMixerNode.outputVolume = self.scaledMasterGain()
+        }
         self.updateChaosParams(deltaEmf: dEmf, accel: accel, zScore: zScore, pitchHz: pitchHz)
         result(true)
 
@@ -411,7 +432,7 @@ import CoreMotion
           let engine = AVAudioEngine()
           engine.attach(sourceNode)
           engine.connect(sourceNode, to: engine.mainMixerNode, format: format)
-          engine.mainMixerNode.outputVolume = 0.85
+          engine.mainMixerNode.outputVolume = self.scaledMasterGain()
           try engine.start()
           self.staticAudioEngine = engine
           self.staticSourceNode  = sourceNode
@@ -537,7 +558,7 @@ EMF baseline: \(String(format: "%.1f", emfBaseline)) uT
 
       do {
         self.creepyPlayer = try AVAudioPlayer(contentsOf: url)
-        self.creepyPlayer?.volume = 1.0
+        self.creepyPlayer?.volume = self.scaledMasterGain()
         self.creepyPlayer?.prepareToPlay()
         let ok = self.creepyPlayer?.play() ?? false
         self.log("playCreepyLaugh -> play()=\(ok)")
@@ -568,7 +589,7 @@ EMF baseline: \(String(format: "%.1f", emfBaseline)) uT
         do {
           try? AVAudioSession.sharedInstance().setActive(true)
           self.audioPlayer = try AVAudioPlayer(data: wavData)
-          self.audioPlayer?.volume = 1.0
+          self.audioPlayer?.volume = self.scaledMasterGain()
           self.audioPlayer?.prepareToPlay()
           let ok = self.audioPlayer?.play() ?? false
           self.log("playTone \(hz)Hz -> play()=\(ok)")

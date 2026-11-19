@@ -14,9 +14,11 @@ class SpectralSweepView extends StatelessWidget {
   final double currentDynamicAccel;
   final List<double> fftDbfs;
   final double audioPeakHz;
+  final double currentVolume;
   final ValueChanged<SweepBand> onBandChanged;
   final ValueChanged<int> onIntervalChanged;
   final ValueChanged<SweepDirection> onDirectionChanged;
+  final ValueChanged<double> onVolumeChanged;
   final VoidCallback onTogglePause;
 
   const SpectralSweepView({
@@ -31,9 +33,11 @@ class SpectralSweepView extends StatelessWidget {
     required this.currentDynamicAccel,
     required this.fftDbfs,
     required this.audioPeakHz,
+    required this.currentVolume,
     required this.onBandChanged,
     required this.onIntervalChanged,
     required this.onDirectionChanged,
+    required this.onVolumeChanged,
     required this.onTogglePause,
   });
 
@@ -438,6 +442,49 @@ class SpectralSweepView extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
                         onPressed: () => onDirectionChanged(SweepDirection.forward),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Controllo Volume Reale Sweep / Audio
+                Row(
+                  children: [
+                    Icon(
+                      currentVolume == 0.0
+                          ? Icons.volume_off
+                          : (currentVolume < 0.5 ? Icons.volume_down : Icons.volume_up),
+                      size: 16,
+                      color: IndustrialPalette.phosphorCyan,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'VOL: ${(currentVolume * 100).round()}%',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        color: IndustrialPalette.textWhite,
+                      ),
+                    ),
+                    Expanded(
+                      child: SliderTheme(
+                        data: const SliderThemeData(
+                          trackHeight: 3,
+                          thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: RoundSliderOverlayShape(overlayRadius: 12),
+                          activeTrackColor: IndustrialPalette.phosphorCyan,
+                          inactiveTrackColor: IndustrialPalette.border,
+                          thumbColor: IndustrialPalette.phosphorCyan,
+                        ),
+                        child: Slider(
+                          value: currentVolume.clamp(0.0, 1.0),
+                          min: 0.0,
+                          max: 1.0,
+                          divisions: 20,
+                          onChanged: onVolumeChanged,
+                        ),
                       ),
                     ),
                   ],
