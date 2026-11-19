@@ -230,7 +230,7 @@ class BaselineEngine {
 
   /// Esegue una tara rapida istantanea sul valore EMF corrente (Zero-Calibration),
   /// aggiornando o impostando deterministicamente il riferimento di base senza attendere i 30 secondi.
-  BaselineProfile applyQuickTare(double currentEmfMagnitude, {double defaultStdDev = 1.0}) {
+  BaselineProfile applyQuickTare(double currentEmfMagnitude, {double defaultStdDev = 1.0, bool notifyComplete = false}) {
     _countdownTimer?.cancel();
     _status = CalibrationStatus.calibrated;
     final now = DateTime.now();
@@ -254,7 +254,9 @@ class BaselineEngine {
       baroMax: prev?.baroMax ?? 1013.25,
     );
 
-    onComplete?.call(_activeProfile!);
+    if (notifyComplete) {
+      onComplete?.call(_activeProfile!);
+    }
     return _activeProfile!;
   }
 

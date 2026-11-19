@@ -25,7 +25,12 @@ class K2LedBarWidget extends StatelessWidget {
 
   /// Determina il numero di LED accesi (da 1 a 5) in base al delta assoluto
   int get activeLedCount {
-    return 1; // Il primo LED verde è sempre illuminato come indicatore di fondo attivo
+    final mag = deltaEmf.abs();
+    if (mag >= 20.0) return 5;
+    if (mag >= 10.0) return 4;
+    if (mag >= 2.5) return 3;
+    if (mag >= 1.5) return 2;
+    return 1;
   }
 
   static const List<_K2LedConfig> _ledConfigs = [
@@ -96,7 +101,7 @@ class K2LedBarWidget extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'Δ ${deltaEmf >= 0 ? '+' : ''}${deltaEmf.toStringAsFixed(1)} µT',
+                '${currentEmf.toStringAsFixed(1)} µT (Δ ${deltaEmf >= 0 ? '+' : ''}${deltaEmf.toStringAsFixed(1)})',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,

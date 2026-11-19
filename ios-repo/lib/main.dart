@@ -100,6 +100,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   bool _isSweepAudioActive = false;
   double _masterVolume = 0.85;
   bool _isMetrologyMonitoringActive = false; // Spento di default, attivato a comando dall'utente
+  bool _initialEmfTareDone = false;
 
   // ── Modulo Vocale Custom Real-Trigger (Completamente Isolato) ──
   late final VocalTriggerEngine _vocalTriggerEngine;
@@ -143,26 +144,14 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       },
     );
 
+    // Inizializza subito la baseline attiva di default (42.0 µT) affinché il K2 e il deltaEmf siano operativi fin dal primo frame
+    final initialBaseline = _baselineEngine.applyQuickTare(42.0, defaultStdDev: 2.0);
+
     _triggerEngine = DeterministicTriggerEngine(
       zThreshold: 3.5,
       touchAccelThreshold: 3.2,
       minPersistenceMs: 150,
-      baseline: BaselineProfile(
-        calibratedAt: now,
-        duration: Duration.zero,
-        totalSamples: 1,
-        emfMean: 42.0,
-        emfStdDev: 2.0,
-        emfMin: 38.0,
-        emfMax: 46.0,
-        vibMean: 0.04,
-        vibStdDev: 0.02,
-        vibMax: 0.1,
-        baroMean: 1013.25,
-        baroStdDev: 0.1,
-        baroMin: 1013.0,
-        baroMax: 1013.5,
-      ),
+      baseline: initialBaseline,
     );
 
     _dspChain = AnalyticalDSPChain(sampleRate: 48000.0);
@@ -215,7 +204,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     final taredProfile = _baselineEngine.applyQuickTare(_currentEmf);
     _triggerEngine.setBaseline(taredProfile);
     setState(() {});
-    _showToast('TARA RAPIDA applicata: \${_currentEmf.toStringAsFixed(1)} µT → nuovo riferimento EMF');
+    _showToast('TARA RAPIDA applicata: ${_currentEmf.toStringAsFixed(1)} µT → nuovo riferimento EMF');
   }
 
   void _startCalibration() {
@@ -258,6 +247,12 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
   void _handleEmfSample(double magnitude) {
     _currentEmf = magnitude;
+    // Auto-tara iniziale automatica alla prima lettura fisica del sensore se non ancora calibrato
+    if (!_initialEmfTareDone && !_baselineEngine.isCalibrated) {
+      _initialEmfTareDone = true;
+      final autoTareProfile = _baselineEngine.applyQuickTare(magnitude, defaultStdDev: 2.0);
+      _triggerEngine.setBaseline(autoTareProfile);
+    }
     if (_isCalibrating) {
       _baselineEngine.ingestEmfMagnitude(magnitude);
       return;
@@ -282,7 +277,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   }
 
   void _evaluateCurrentSensors() {
-    if (_isCalibrating || !_isMetrologyMonitoringActive) return;
+    if (_isCalibrating) return;
 
     final reading = SensorReading(
       timestamp: DateTime.now(),
@@ -292,33 +287,38 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
 
     final res = _triggerEngine.evaluate(reading);
-    if (res.shouldTriggerAlarmSound) {
-      // COINCIDENZA DUAL-TRIGGER: Tocco (|A_dyn| >= 3.2 m/s²) + Anomalia EMF (|Z| >= 3.5σ)
-      // Unica condizione abilitata all'emissione del suono di allarme personalizzato!
-      _playAlarmSound();
-      _forensicLogger.logTrigger(
-        res,
-        pressureHpa: _currentPressure,
-        audioPeakHz: _audioPeakHz,
-        audioPeakDbfs: _audioPeakDbfs,
-      );
-    } else if (res.isEnvironmentalAnomaly) {
-      // Anomalia metrologica pura (|Z| >= 3.5σ ma nessun tocco): registrazione forense senza suono tocco
-      _forensicLogger.logTrigger(
-        res,
-        pressureHpa: _currentPressure,
-        audioPeakHz: _audioPeakHz,
-        audioPeakDbfs: _audioPeakDbfs,
-      );
-    } else if (res.isMechanicalTouch) {
-      // Urto o contatto meccanico sul telaio senza anomalia EMF contemporanea
-      _playAlertBeep(520, 80); // Feedback acustico istantaneo di avvenuto impatto fisico
-      _forensicLogger.logTrigger(
-        res,
-        pressureHpa: _currentPressure,
-      );
+
+    // Allarmi sonori e registrazione forense scattano SOLO se Metrology Monitoring è espressamente attivo
+    if (_isMetrologyMonitoringActive) {
+      if (res.shouldTriggerAlarmSound) {
+        // COINCIDENZA DUAL-TRIGGER: Tocco (|A_dyn| >= 3.2 m/s²) + Anomalia EMF (|Z| >= 3.5σ)
+        // Unica condizione abilitata all'emissione del suono di allarme personalizzato!
+        _playAlarmSound();
+        _forensicLogger.logTrigger(
+          res,
+          pressureHpa: _currentPressure,
+          audioPeakHz: _audioPeakHz,
+          audioPeakDbfs: _audioPeakDbfs,
+        );
+      } else if (res.isEnvironmentalAnomaly) {
+        // Anomalia metrologica pura (|Z| >= 3.5σ ma nessun tocco): registrazione forense senza suono tocco
+        _forensicLogger.logTrigger(
+          res,
+          pressureHpa: _currentPressure,
+          audioPeakHz: _audioPeakHz,
+          audioPeakDbfs: _audioPeakDbfs,
+        );
+      } else if (res.isMechanicalTouch) {
+        // Urto o contatto meccanico sul telaio senza anomalia EMF contemporanea
+        _playAlertBeep(520, 80); // Feedback acustico istantaneo di avvenuto impatto fisico
+        _forensicLogger.logTrigger(
+          res,
+          pressureHpa: _currentPressure,
+        );
+      }
     }
 
+    // Aggiornamento reattivo costante della UI (K2 meter, telemetria ed oscilloscopio)
     if (mounted) setState(() => _lastTriggerResult = res);
   }
 
@@ -1417,13 +1417,13 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               ),
             ),
 
-                K2LedBarWidget(
-                  currentEmf: _currentEmf,
-                  deltaEmf: deltaEmf,
-                  zScore: zScore,
-                  onQuickTare: _applyQuickTare,
-                ),
-                const SizedBox(height: 8),
+          K2LedBarWidget(
+            currentEmf: _currentEmf,
+            deltaEmf: deltaEmf,
+            zScore: zScore,
+            onQuickTare: _applyQuickTare,
+          ),
+          const SizedBox(height: 8),
 
           // ── 1. Telemetry Cards Row ──
           Row(

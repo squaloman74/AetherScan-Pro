@@ -101,7 +101,7 @@ class K2LedBarWidget extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                'Δ ${deltaEmf >= 0 ? '+' : ''}${deltaEmf.toStringAsFixed(1)} µT',
+                '${currentEmf.toStringAsFixed(1)} µT (Δ ${deltaEmf >= 0 ? '+' : ''}${deltaEmf.toStringAsFixed(1)})',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
