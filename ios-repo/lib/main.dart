@@ -17,6 +17,7 @@ import 'spectral_sweep_engine.dart';
 import 'spectral_sweep_view.dart';
 import 'vocal_trigger_engine.dart';
 import 'k2_led_bar.dart';
+import 'k2_controller.dart';
 
 /// Modalità operative selezionabili dal Menu Hamburger
 enum AppOperatingMode {
@@ -101,6 +102,9 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   double _masterVolume = 0.85;
   bool _isMetrologyMonitoringActive = false; // Spento di default, attivato a comando dall'utente
   bool _initialEmfTareDone = false;
+  final K2Controller _k2Controller = K2Controller();
+  Timer? _sensorRetryTimer;
+  bool _sensorHasStreamed = false;
 
   // ── Modulo Vocale Custom Real-Trigger (Completamente Isolato) ──
   late final VocalTriggerEngine _vocalTriggerEngine;
@@ -134,6 +138,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           _isCalibrating = false;
           _triggerEngine.setBaseline(profile);
         });
+        _k2Controller.tare(profile.emfMean);
         _playAlertBeep(880, 150);
         _showToast('Calibrazione completata! Baseline impostata.');
       },
@@ -180,6 +185,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     _baselineEngine.onProgress = null;
     _baselineEngine.onComplete = null;
     _sensorSubscription?.cancel();
+    _sensorRetryTimer?.cancel();
     _dspSimulationTimer?.cancel();
     _baselineEngine.cancelCalibration();
     super.dispose();
@@ -201,6 +207,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   }
 
   void _applyQuickTare() {
+    _k2Controller.tare();
     final taredProfile = _baselineEngine.applyQuickTare(_currentEmf);
     _triggerEngine.setBaseline(taredProfile);
     setState(() {});
@@ -218,10 +225,24 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   }
 
   void _startSensorStream() {
+    _sensorSubscription?.cancel();
+    _sensorRetryTimer?.cancel();
+
+    // Watchdog di auto-riconnessione: se iOS ritarda la registrazione del canale, riprova ogni 2s finché non arrivano dati
+    _sensorRetryTimer = Timer.periodic(const Duration(seconds: 2), (t) {
+      if (!mounted || _sensorHasStreamed) {
+        t.cancel();
+        return;
+      }
+      _startSensorStream();
+    });
+
     try {
       _sensorSubscription = _sensorChannel.receiveBroadcastStream().listen(
         (dynamic event) {
           if (event == null || !mounted) return;
+          _sensorHasStreamed = true;
+          _sensorRetryTimer?.cancel();
           final map = Map<String, dynamic>.from(event as Map);
           final type = map['type'] as String? ?? '';
 
@@ -247,6 +268,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
   void _handleEmfSample(double magnitude) {
     _currentEmf = magnitude;
+    _k2Controller.ingestRawEmf(magnitude);
     // Auto-tara iniziale automatica alla prima lettura fisica del sensore se non ancora calibrato
     if (!_initialEmfTareDone && !_baselineEngine.isCalibrated) {
       _initialEmfTareDone = true;
@@ -1417,10 +1439,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               ),
             ),
 
-          K2LedBarWidget(
-            currentEmf: _currentEmf,
-            deltaEmf: deltaEmf,
-            zScore: zScore,
+          K2LedBarWidget.modular(
+            controller: _k2Controller,
             onQuickTare: _applyQuickTare,
           ),
           const SizedBox(height: 8),

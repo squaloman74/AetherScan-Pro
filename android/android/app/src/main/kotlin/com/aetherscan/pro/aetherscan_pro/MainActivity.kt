@@ -216,7 +216,7 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
         sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)

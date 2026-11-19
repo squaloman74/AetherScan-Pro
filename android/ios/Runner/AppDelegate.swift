@@ -64,32 +64,51 @@ import CoreMotion
 
   @objc private func onAppBecameActive() { registerChannel() }
 
-  // ──────────────────────────────────────────────────────────────────
+  public func registerChannelIfNeeded() { registerChannel() }
+
   private func registerChannel() {
     guard !channelRegistered else { return }
-
     var flutterVC: FlutterViewController?
 
     if let vc = window?.rootViewController as? FlutterViewController {
       flutterVC = vc
     } else {
       for scene in UIApplication.shared.connectedScenes {
-        guard let ws = scene as? UIWindowScene,
-              ws.activationState == .foregroundActive,
-              let vc = ws.windows.first?.rootViewController as? FlutterViewController
-        else { continue }
-        flutterVC = vc
-        break
+        if let ws = scene as? UIWindowScene {
+          for w in ws.windows {
+            if let vc = w.rootViewController as? FlutterViewController {
+              flutterVC = vc
+              break
+            }
+          }
+        }
+        if flutterVC != nil { break }
       }
     }
 
-    guard let vc = flutterVC else {
-      log("window non ancora pronta - attendo didBecomeActive")
-      return
+    if let vc = flutterVC {
+      setupChannels(with: vc)
+    } else {
+      log("window non ancora pronta - attendo sceneDidBecomeActive / retry")
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        self?.registerChannel()
+      }
     }
+  }
 
+  // ──────────────────────────────────────────────────────────────────
+  private let sensorQueue: OperationQueue = {
+    let q = OperationQueue()
+    q.name = "com.aetherscan.pro.sensors"
+    q.qualityOfService = .userInteractive
+    q.maxConcurrentOperationCount = 2
+    return q
+  }()
+
+  public func setupChannels(with vc: FlutterViewController) {
+    guard !channelRegistered else { return }
     channelRegistered = true
-    log("MethodChannel + EventChannel registrati")
+    log("setupChannels: MethodChannel + EventChannel registrati con successo!")
 
     // ── MethodChannel ──
     let ch = FlutterMethodChannel(name: channelName, binaryMessenger: vc.binaryMessenger)
@@ -294,40 +313,47 @@ import CoreMotion
   // Magnetometro EMF
   // ──────────────────────────────────────────────────────────────────
   private func startMagnetometer() {
-    guard motionManager.isMagnetometerAvailable else {
-      log("Magnetometro non disponibile")
-      return
-    }
-    motionManager.magnetometerUpdateInterval = 0.4
-    motionManager.startMagnetometerUpdates(to: .main) { [weak self] data, _ in
-      guard let self = self, let data = data else { return }
-      let x = data.magneticField.x
-      let y = data.magneticField.y
-      let z = data.magneticField.z
-      let magnitude = sqrt(x*x + y*y + z*z)
+    if motionManager.isMagnetometerAvailable {
+      motionManager.magnetometerUpdateInterval = 0.05 // 20 Hz
+      motionManager.startMagnetometerUpdates(to: sensorQueue) { [weak self] data, _ in
+        guard let self = self, let data = data else { return }
+        let x = data.magneticField.x
+        let y = data.magneticField.y
+        let z = data.magneticField.z
+        let magnitude = sqrt(x*x + y*y + z*z)
 
-      if self.emfBaseline < 0 {
-        self.emfBaseline = magnitude
-        return
+        if self.emfBaseline < 0 {
+          self.emfBaseline = magnitude
+        }
+        let delta = abs(magnitude - self.emfBaseline)
+        let isSpike = delta > 25.0
+        self.emfBaseline = self.emfBaseline * 0.98 + magnitude * 0.02
+
+        DispatchQueue.main.async {
+          self.sensorEventSink?(["type": "emf", "value": magnitude, "delta": delta, "spike": isSpike])
+        }
       }
-
-      let delta = abs(magnitude - self.emfBaseline)
-      let spikeThreshold = 25.0
-
-      let isSpike: Bool
-      if delta > spikeThreshold && !self.emfSpikeActive {
-        self.emfSpikeActive = true
-        isSpike = true
-        self.log("EMF SPIKE: \(String(format: "%.1f", delta)) uT sopra baseline")
-      } else if delta <= spikeThreshold * 0.5 {
-        self.emfSpikeActive = false
-        isSpike = false
-      } else {
-        isSpike = false
+      log("Magnetometro CoreMotion avviato su background queue a 20 Hz")
+    } else if motionManager.isDeviceMotionAvailable {
+      motionManager.deviceMotionUpdateInterval = 0.05
+      motionManager.startDeviceMotionUpdates(using: .xArbitraryCorrectedZVertical, to: sensorQueue) { [weak self] motion, _ in
+        guard let self = self, let motion = motion else { return }
+        let field = motion.magneticField.field
+        let magnitude = sqrt(field.x*field.x + field.y*field.y + field.z*field.z)
+        if magnitude > 0 {
+          if (self?.emfBaseline ?? -1) < 0 {
+            self?.emfBaseline = magnitude
+          }
+          let delta = abs(magnitude - (self?.emfBaseline ?? magnitude))
+          let isSpike = delta > 25.0
+          DispatchQueue.main.async {
+            self?.sensorEventSink?(["type": "emf", "value": magnitude, "delta": delta, "spike": isSpike])
+          }
+        }
       }
-
-      self.emfBaseline = self.emfBaseline * 0.98 + magnitude * 0.02
-      self.sensorEventSink?(["type": "emf", "value": magnitude, "delta": delta, "spike": isSpike])
+      log("Fallback su DeviceMotion magnetico avviato")
+    } else {
+      log("ATTENZIONE: Nessun sensore magnetico disponibile")
     }
   }
 
@@ -335,6 +361,7 @@ import CoreMotion
     UIDevice.current.isProximityMonitoringEnabled = false
     NotificationCenter.default.removeObserver(self, name: UIDevice.proximityStateDidChangeNotification, object: nil)
     motionManager.stopMagnetometerUpdates()
+    motionManager.stopDeviceMotionUpdates()
     motionManager.stopAccelerometerUpdates()
   }
 

@@ -266,17 +266,30 @@ class BaselineEngine {
     final now = DateTime.now();
     final duration = _startTime != null ? now.difference(_startTime!) : targetDuration;
 
+    final double safeEmfMean = _emfAcc.count > 0 ? _emfAcc.mean : (_activeProfile?.emfMean ?? 42.0);
+    final double safeEmfStdDev = (_emfAcc.count > 1 && _emfAcc.standardDeviation > 0.05)
+        ? _emfAcc.standardDeviation
+        : 2.0;
+    final double safeEmfMin = _emfAcc.count > 0 ? _emfAcc.min : safeEmfMean;
+    final double safeEmfMax = _emfAcc.count > 0 ? _emfAcc.max : safeEmfMean;
+
+    final double safeVibMean = _vibAcc.count > 0 ? _vibAcc.mean : 0.04;
+    final double safeVibStdDev = (_vibAcc.count > 1 && _vibAcc.standardDeviation > 0.005)
+        ? _vibAcc.standardDeviation
+        : 0.01;
+    final double safeVibMax = _vibAcc.count > 0 ? _vibAcc.max : 0.10;
+
     _activeProfile = BaselineProfile(
       calibratedAt: now,
       duration: duration,
       totalSamples: _emfAcc.count,
-      emfMean: _emfAcc.mean,
-      emfStdDev: _emfAcc.standardDeviation,
-      emfMin: _emfAcc.min,
-      emfMax: _emfAcc.max,
-      vibMean: _vibAcc.mean,
-      vibStdDev: _vibAcc.standardDeviation,
-      vibMax: _vibAcc.max,
+      emfMean: safeEmfMean,
+      emfStdDev: safeEmfStdDev,
+      emfMin: safeEmfMin,
+      emfMax: safeEmfMax,
+      vibMean: safeVibMean,
+      vibStdDev: safeVibStdDev,
+      vibMax: safeVibMax,
       baroMean: _baroAcc.count > 0 ? _baroAcc.mean : 1013.25,
       baroStdDev: _baroAcc.count > 0 ? _baroAcc.standardDeviation : 0.05,
       baroMin: _baroAcc.count > 0 ? _baroAcc.min : 1013.25,

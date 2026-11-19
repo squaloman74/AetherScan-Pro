@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aetherscan_pro/k2_led_bar.dart';
+import 'package:aetherscan_pro/k2_controller.dart';
 import 'package:aetherscan_pro/baseline_engine.dart';
 
 void main() {
@@ -206,6 +207,37 @@ void main() {
       );
       // Delta 5.2 µT ricade nella fascia MID (2.5 - 10 µT) -> 3 LED
       expect(widget.activeLedCount, equals(3));
+    });
+
+    testWidgets('K2LedBarWidget.modular reagisce istantaneamente agli aggiornamenti di K2Controller', (tester) async {
+      final ctrl = K2Controller();
+      ctrl.ingestRawEmf(45.0); // prima lettura fisica fissa baseline a 45.0 µT
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: K2LedBarWidget.modular(
+              controller: ctrl,
+            ),
+          ),
+        ),
+      );
+
+      // Inizialmente 45.0 µT e delta 0.0 -> 1 LED (NORM)
+      expect(find.text('45.0 µT (Δ +0.0)'), findsOneWidget);
+      expect(find.text('NORM'), findsOneWidget);
+
+      // Simula avvicinamento a sorgente magnetica -> 60.0 µT (delta +15.0 -> HIGH, 4 LED)
+      ctrl.ingestRawEmf(60.0);
+      await tester.pump();
+
+      expect(find.text('60.0 µT (Δ +15.0)'), findsOneWidget);
+
+      // Simula tara rapida -> nuovo zero a 60.0 µT (delta +0.0 -> NORM, 1 LED)
+      ctrl.tare();
+      await tester.pump();
+
+      expect(find.text('60.0 µT (Δ +0.0)'), findsOneWidget);
     });
   });
 }
