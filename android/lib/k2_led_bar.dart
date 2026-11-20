@@ -6,6 +6,7 @@ import 'k2_controller.dart';
 /// ====================================================================================
 /// Scala fisica a 5 segmenti pilotata in tempo reale dal controller indipendente K2Controller
 /// oppure dai valori diretti di delta EMF (|ΔEMF| in µT):
+/// - 0 LED: Strumento Spento / Standby
 /// - LED 1: Verde   (Normale / Fondo: < 1.5 µT)
 /// - LED 2: Verde   (Fluttuazione Lieve: 1.5 - 2.5 µT)
 /// - LED 3: Giallo  (Anomalia Misurabile: 2.5 - 10.0 µT)
@@ -17,6 +18,7 @@ class K2LedBarWidget extends StatelessWidget {
   final double deltaEmf;
   final double zScore;
   final VoidCallback? onQuickTare;
+  final VoidCallback? onTogglePower;
 
   const K2LedBarWidget({
     super.key,
@@ -25,6 +27,7 @@ class K2LedBarWidget extends StatelessWidget {
     this.deltaEmf = 0.0,
     this.zScore = 0.0,
     this.onQuickTare,
+    this.onTogglePower,
   });
 
   /// Costruttore modulare e disaccoppiato basato su K2Controller
@@ -32,11 +35,12 @@ class K2LedBarWidget extends StatelessWidget {
     super.key,
     required K2Controller this.controller,
     this.onQuickTare,
+    this.onTogglePower,
   })  : currentEmf = 42.0,
         deltaEmf = 0.0,
         zScore = 0.0;
 
-  /// Determina il numero di LED accesi (da 1 a 5) in base al delta assoluto
+  /// Determina il numero di LED accesi (da 0 a 5)
   int get activeLedCount {
     if (controller != null) return controller!.activeLedCount;
     final mag = deltaEmf.abs();
@@ -90,6 +94,7 @@ class K2LedBarWidget extends StatelessWidget {
           curEmf: controller!.currentEmf,
           dEmf: controller!.deltaEmf,
           count: controller!.activeLedCount,
+          isActive: controller!.isActive,
         ),
       );
     }
@@ -99,6 +104,7 @@ class K2LedBarWidget extends StatelessWidget {
       curEmf: currentEmf,
       dEmf: deltaEmf,
       count: activeLedCount,
+      isActive: true,
     );
   }
 
@@ -107,14 +113,27 @@ class K2LedBarWidget extends StatelessWidget {
     required double curEmf,
     required double dEmf,
     required int count,
+    required bool isActive,
   }) {
+    // Colore del valore EMF in base al livello attivo, gestendo count == 0 in piena sicurezza
+    final Color valueColor;
+    if (!isActive || count == 0) {
+      valueColor = IndustrialPalette.textMuted;
+    } else if (count >= 3 && count <= _ledConfigs.length) {
+      valueColor = _ledConfigs[count - 1].activeColor;
+    } else {
+      valueColor = IndustrialPalette.phosphorCyan;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: IndustrialPalette.surface,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: count >= 4 ? IndustrialPalette.alertAmber : IndustrialPalette.border,
+          color: (!isActive || count == 0)
+              ? IndustrialPalette.border
+              : (count >= 4 ? IndustrialPalette.alertAmber : IndustrialPalette.phosphorCyan.withValues(alpha: 0.3)),
           width: count >= 4 ? 1.5 : 1.0,
         ),
       ),
@@ -122,10 +141,14 @@ class K2LedBarWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header: Intestazione K2 + Valori + Bottone Tara Rapida
+          // Header: Intestazione K2 + Stato + Valori + Comandi PWR & TARA
           Row(
             children: [
-              const Icon(Icons.flash_on, color: IndustrialPalette.alertAmber, size: 14),
+              Icon(
+                Icons.flash_on,
+                color: isActive ? IndustrialPalette.alertAmber : IndustrialPalette.textMuted,
+                size: 14,
+              ),
               const SizedBox(width: 4),
               const Text(
                 'K2 FIELD METER',
@@ -139,16 +162,67 @@ class K2LedBarWidget extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${curEmf.toStringAsFixed(1)} µT (Δ ${dEmf >= 0 ? '+' : ''}${dEmf.toStringAsFixed(1)})',
+                isActive
+                    ? '${curEmf.toStringAsFixed(1)} µT (Δ ${dEmf >= 0 ? '+' : ''}${dEmf.toStringAsFixed(1)})'
+                    : '${curEmf.toStringAsFixed(1)} µT [STANDBY]',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
-                  color: count >= 3 ? _ledConfigs[count - 1].activeColor : IndustrialPalette.phosphorCyan,
+                  color: valueColor,
                 ),
               ),
+              const SizedBox(width: 6),
+
+              // Pulsante ON/OFF (Power Toggle)
+              InkWell(
+                onTap: () {
+                  if (onTogglePower != null) {
+                    onTogglePower!();
+                  } else {
+                    controller?.toggleActive();
+                  }
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? IndustrialPalette.phosphorGreen.withValues(alpha: 0.2)
+                        : IndustrialPalette.surfaceLight,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: isActive
+                          ? IndustrialPalette.phosphorGreen
+                          : IndustrialPalette.textMuted.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.power_settings_new,
+                        size: 11,
+                        color: isActive ? IndustrialPalette.phosphorGreen : IndustrialPalette.textMuted,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        isActive ? 'ON' : 'OFF',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                          color: isActive ? IndustrialPalette.phosphorGreen : IndustrialPalette.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Pulsante TARA Rapida (abilitato quando attivo)
               if (onQuickTare != null || controller != null) ...[
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 InkWell(
                   onTap: () {
                     controller?.tare();
@@ -160,20 +234,28 @@ class K2LedBarWidget extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: IndustrialPalette.surfaceLight,
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: IndustrialPalette.phosphorCyan.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: isActive
+                            ? IndustrialPalette.phosphorCyan.withValues(alpha: 0.5)
+                            : IndustrialPalette.border,
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.exposure_zero, size: 11, color: IndustrialPalette.phosphorCyan),
-                        SizedBox(width: 2),
+                        Icon(
+                          Icons.exposure_zero,
+                          size: 11,
+                          color: isActive ? IndustrialPalette.phosphorCyan : IndustrialPalette.textMuted,
+                        ),
+                        const SizedBox(width: 2),
                         Text(
                           'TARA',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'monospace',
-                            color: IndustrialPalette.phosphorCyan,
+                            color: isActive ? IndustrialPalette.phosphorCyan : IndustrialPalette.textMuted,
                           ),
                         ),
                       ],
@@ -188,7 +270,7 @@ class K2LedBarWidget extends StatelessWidget {
           // 5 Segmenti LED Orizzontali
           Row(
             children: List.generate(_ledConfigs.length, (index) {
-              final isLit = index < count;
+              final isLit = isActive && (index < count);
               final cfg = _ledConfigs[index];
 
               return Expanded(

@@ -41,14 +41,10 @@ class MainActivity : FlutterActivity(), TextToSpeech.OnInitListener {
                     result.success(hwid)
                 }
                 "getSavedLicense" -> {
-                    val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    val savedKey = prefs.getString(PREF_KEY_LICENSE, "") ?: ""
-                    result.success(savedKey)
+                    // App 100% gratuita e offline standalone
+                    result.success("FREE_OFFLINE_STANDALONE")
                 }
                 "saveLicense" -> {
-                    val keyToSave = call.argument<String>("licenseKey") ?: ""
-                    val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    prefs.edit().putString(PREF_KEY_LICENSE, keyToSave).apply()
                     result.success(true)
                 }
                 "speak" -> {

@@ -160,8 +160,9 @@ class DeterministicTriggerEngine {
     }
 
     // 1. Calcolo Z-Score e Delta per EMF (Condizione Metrologica)
+    // Pavimento minimo a 0.2 µT coerente con il rumore termico/fisico dei magnetometri smartphone
     final double deltaEmf = reading.emfMagnitude - base.emfMean;
-    final double emfSd = max(base.emfStdDev, 0.01);
+    final double emfSd = max(base.emfStdDev, 0.2);
     final double zScoreEmf = deltaEmf / emfSd;
 
     // Rapporto Segnale-Rumore (SNR in dB): 20 * log10(|delta| / std_dev)

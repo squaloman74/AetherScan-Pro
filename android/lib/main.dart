@@ -39,7 +39,7 @@ class AetherScanProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AetherScan-Pro v27-beta2.8 (Metrology Suite)',
+      title: 'AetherScan-Pro v27-beta3.0 (Metrology Suite)',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: IndustrialPalette.background,
@@ -92,7 +92,6 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
   TriggerResult? _lastTriggerResult;
   String _deviceHwid = 'INITIALIZING...';
-  bool _isAuthorized = false;
 
   // ── Modalità Operativa e Scansione Spettrale ──
   AppOperatingMode _activeMode = AppOperatingMode.metrologyPro;
@@ -194,11 +193,9 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   Future<void> _loadHwid() async {
     try {
       final hwid = await _audioChannel.invokeMethod<String>('getDeviceHwid');
-      final saved = await _audioChannel.invokeMethod<String>('getSavedLicense');
       if (mounted) {
         setState(() {
           _deviceHwid = hwid ?? 'ASPRO-FIELD-METROLOGY';
-          _isAuthorized = saved != null && saved.trim().isNotEmpty;
         });
       }
     } catch (_) {
@@ -345,11 +342,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   }
 
   void _playAlarmSound() {
-    try {
-      _audioChannel.invokeMethod('playCreepyLaugh');
-    } catch (_) {
-      _playAlertBeep(1200, 200);
-    }
+    _playAlertBeep(1200, 250);
   }
 
   void _handlePressureSample(double hPa) {
@@ -512,7 +505,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Livello Master: ' + (_masterVolume * 100).round().toString() + '%',
+                'Livello Master: ${(_masterVolume * 100).round()}%',
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: IndustrialPalette.textWhite),
               ),
               const SizedBox(height: 12),
@@ -598,7 +591,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'HWID: $_deviceHwid (${_isAuthorized ? 'LICENZIATO' : 'STANDALONE'})',
+              'HWID: $_deviceHwid (STANDALONE OFFLINE)',
               style: const TextStyle(fontSize: 10.5, color: IndustrialPalette.textMuted, fontFamily: 'monospace'),
             ),
             const SizedBox(height: 6),
@@ -640,7 +633,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             Icon(Icons.info_outline, color: IndustrialPalette.phosphorCyan, size: 22),
             SizedBox(width: 8),
             Text(
-              'AETHERSCAN-PRO v27-beta2.8',
+              'AETHERSCAN-PRO v27-beta3.0',
               style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.bold),
             ),
           ],
@@ -675,7 +668,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Specifiche Release v27-beta2.8 (Build 2.0.28+279):',
+              'Specifiche Release v27-beta3.0 (Build 2.0.30+280):',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: IndustrialPalette.textWhite),
             ),
             const SizedBox(height: 6),
@@ -755,7 +748,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             : (androidUrl ?? defaultUrl);
 
         if (!mounted) return;
-        if (latest.isNotEmpty && latest != 'v27-beta2.8') {
+        if (latest.isNotEmpty && latest != 'v27-beta3.0') {
           _showUpdateResultDialog(
             isNewAvailable: true,
             version: latest,
@@ -766,7 +759,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
         } else {
           _showUpdateResultDialog(
             isNewAvailable: false,
-            version: latest.isNotEmpty ? latest : 'v27-beta2.8',
+            version: latest.isNotEmpty ? latest : 'v27-beta3.0',
             message: 'Sei all\'ultima versione disponibile. Tutti i moduli scientifici sono aggiornati.',
           );
           return;
@@ -775,7 +768,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     } catch (_) {}
 
     if (mounted) {
-      _showToast('Sei all\'ultima versione disponibile: v27-beta2.8');
+      _showToast('Sei all\'ultima versione disponibile: v27-beta3.0');
     }
   }
 
@@ -926,7 +919,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'v27-beta2.8 • SCIENTIFIC METROLOGY',
+                  'v27-beta3.0 • SCIENTIFIC METROLOGY',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
@@ -1047,7 +1040,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             trailing: Switch(
               value: _vocalTriggerEngine.isEnabled,
-              activeColor: IndustrialPalette.phosphorGreen,
+              activeThumbColor: IndustrialPalette.phosphorGreen,
               onChanged: (val) {
                 setState(() {
                   _vocalTriggerEngine.setEnabled(val);
@@ -1077,7 +1070,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
             ),
             title: const Text('Volume Master Audio', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
             subtitle: Text(
-              'Livello: ' + (_masterVolume * 100).round().toString() + '% (TTS, Radio & Beep)',
+              'Livello: ${(_masterVolume * 100).round()}% (TTS, Radio & Beep)',
               style: const TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted),
             ),
             onTap: () {
@@ -1089,7 +1082,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
           ListTile(
             leading: const Icon(Icons.system_update_alt, color: IndustrialPalette.phosphorCyan, size: 20),
             title: const Text('Verifica Aggiornamenti', style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-            subtitle: const Text('v27-beta2.8 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
+            subtitle: const Text('v27-beta3.0 • Controlla versione e stato', style: TextStyle(fontSize: 9.5, color: IndustrialPalette.textMuted)),
             onTap: () {
               Navigator.pop(context);
               _showVersionInfoDialog();
@@ -1159,8 +1152,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
                   ),
                   Text(
                     _activeMode == AppOperatingMode.metrologyPro
-                        ? 'v27-beta2.8 • METROLOGY'
-                        : 'v27-beta2.8 • SWEEP',
+                        ? 'v27-beta3.0 • METROLOGY'
+                        : 'v27-beta3.0 • SWEEP',
                     style: TextStyle(
                       fontSize: 8,
                       color: _activeMode == AppOperatingMode.metrologyPro
@@ -1227,7 +1220,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
               color: IndustrialPalette.phosphorCyan,
               size: 20,
             ),
-            tooltip: 'Volume: ' + (_masterVolume * 100).round().toString() + '%',
+            tooltip: 'Volume: ${(_masterVolume * 100).round()}%',
             onPressed: _showVolumeDialog,
           ),
           IconButton(

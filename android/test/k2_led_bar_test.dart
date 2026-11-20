@@ -209,8 +209,35 @@ void main() {
       expect(widget.activeLedCount, equals(3));
     });
 
+    testWidgets('K2LedBarWidget.modular in standby mostra stato OFF e 0 LED, e si attiva al toggle', (tester) async {
+      final ctrl = K2Controller(initiallyActive: false);
+      ctrl.ingestRawEmf(42.0);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: K2LedBarWidget.modular(
+              controller: ctrl,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('42.0 µT [STANDBY]'), findsOneWidget);
+      expect(find.text('OFF'), findsOneWidget);
+
+      // Tocca il pulsante di accensione
+      await tester.tap(find.text('OFF'));
+      await tester.pump();
+
+      expect(ctrl.isActive, isTrue);
+      expect(find.text('ON'), findsOneWidget);
+      expect(find.text('42.0 µT (Δ +0.0)'), findsOneWidget);
+      expect(find.text('NORM'), findsOneWidget);
+    });
+
     testWidgets('K2LedBarWidget.modular reagisce istantaneamente agli aggiornamenti di K2Controller', (tester) async {
-      final ctrl = K2Controller();
+      final ctrl = K2Controller(initiallyActive: true);
       ctrl.ingestRawEmf(45.0); // prima lettura fisica fissa baseline a 45.0 µT
 
       await tester.pumpWidget(

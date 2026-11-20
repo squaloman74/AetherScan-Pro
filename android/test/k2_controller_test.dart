@@ -3,29 +3,59 @@ import 'package:aetherscan_pro/k2_controller.dart';
 
 void main() {
   group('K2Controller — Test Modulo Indipendente K2', () {
-    test('Inizializzazione con baseline predefinita', () {
+    test('Inizializzazione con default Standby (Spento)', () {
       final ctrl = K2Controller(initialBaseline: 42.0);
       expect(ctrl.currentEmf, equals(42.0));
       expect(ctrl.baselineEmf, equals(42.0));
       expect(ctrl.deltaEmf, equals(0.0));
-      expect(ctrl.activeLedCount, equals(1)); // 1 LED verde NORM
+      expect(ctrl.isActive, isFalse);
+      expect(ctrl.activeLedCount, equals(0)); // 0 LED quando spento
       expect(ctrl.isAutoTared, isFalse);
     });
 
-    test('Prima ingestione fa auto-tara trasparente sul valore reale del sensore', () {
+    test('Attivazione esplicita e auto-tara immediata', () {
       final ctrl = K2Controller(initialBaseline: 42.0);
-      ctrl.ingestRawEmf(48.5);
-
+      ctrl.ingestRawEmf(48.5); // da spento memorizza la lettura fisica
+      expect(ctrl.isActive, isFalse);
+      expect(ctrl.activeLedCount, equals(0));
       expect(ctrl.currentEmf, equals(48.5));
+
+      ctrl.activate();
+      expect(ctrl.isActive, isTrue);
       expect(ctrl.baselineEmf, equals(48.5));
       expect(ctrl.deltaEmf, equals(0.0));
-      expect(ctrl.activeLedCount, equals(1)); // NORM
+      expect(ctrl.activeLedCount, equals(1)); // 1 LED verde NORM da attivo
       expect(ctrl.isAutoTared, isTrue);
     });
 
-    test('Reattività a variazioni progressive (5 soglie fisiche dei LED)', () {
+    test('Disattivazione (Standby) azzera i LED attivi', () {
+      final ctrl = K2Controller(initiallyActive: true);
+      ctrl.ingestRawEmf(42.0);
+      ctrl.ingestRawEmf(55.0); // picco
+      expect(ctrl.activeLedCount, equals(4)); // HIGH
+
+      ctrl.deactivate();
+      expect(ctrl.isActive, isFalse);
+      expect(ctrl.activeLedCount, equals(0)); // Tutti i LED spenti
+      expect(ctrl.deltaEmf, equals(0.0));
+    });
+
+    test('Toggle accensione/spegnimento', () {
       final ctrl = K2Controller();
-      ctrl.ingestRawEmf(40.0); // fissa baseline a 40.0 µT
+      expect(ctrl.isActive, isFalse);
+
+      ctrl.toggleActive();
+      expect(ctrl.isActive, isTrue);
+      expect(ctrl.activeLedCount, equals(1));
+
+      ctrl.toggleActive();
+      expect(ctrl.isActive, isFalse);
+      expect(ctrl.activeLedCount, equals(0));
+    });
+
+    test('Reattività a variazioni progressive da attivo (5 soglie fisiche)', () {
+      final ctrl = K2Controller(initiallyActive: true);
+      ctrl.ingestRawEmf(40.0); // baseline a 40.0 µT
 
       // 1. Delta < 1.5 -> LED 1 (NORM)
       ctrl.ingestRawEmf(41.0); // delta = +1.0
@@ -49,8 +79,8 @@ void main() {
     });
 
     test('Deviazione assoluta gestisce correttamente campi negativi dopo una tara alta', () {
-      final ctrl = K2Controller();
-      ctrl.ingestRawEmf(60.0); // fissa baseline a 60.0 µT
+      final ctrl = K2Controller(initiallyActive: true);
+      ctrl.ingestRawEmf(60.0); // baseline a 60.0 µT
       ctrl.ingestRawEmf(35.0); // delta = -25.0 µT
 
       expect(ctrl.deltaEmf, equals(-25.0));
@@ -58,7 +88,7 @@ void main() {
     });
 
     test('Comando manuale tara fissa il nuovo zero sul valore attuale', () {
-      final ctrl = K2Controller();
+      final ctrl = K2Controller(initiallyActive: true);
       ctrl.ingestRawEmf(45.0);
       ctrl.ingestRawEmf(70.0); // picco
       expect(ctrl.deltaEmf, equals(25.0));
@@ -70,16 +100,18 @@ void main() {
       expect(ctrl.activeLedCount, equals(1)); // torna su NORM
     });
 
-    test('Notifica i listener su ogni ingestione e tara', () {
+    test('Notifica i listener su ogni ingestione, cambio stato e tara', () {
       final ctrl = K2Controller();
       int notifyCount = 0;
       ctrl.addListener(() => notifyCount++);
 
       ctrl.ingestRawEmf(45.0);
+      ctrl.activate();
       ctrl.ingestRawEmf(46.0);
       ctrl.tare();
+      ctrl.deactivate();
 
-      expect(notifyCount, equals(3));
+      expect(notifyCount, equals(5));
     });
   });
 }

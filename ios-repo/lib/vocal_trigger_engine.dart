@@ -1,4 +1,3 @@
-
 import 'metrology_lexicon.dart';
 import 'investigative_lexicon.dart';
 import 'names_lexicon.dart';
@@ -11,10 +10,10 @@ enum VocalLexiconBank {
   /// Bank B: Vocabolario investigativo classico sul campo (128 termini)
   investigative,
 
-  /// Bank C: Anagrafico â€” Solo Nomi di battesimo (128 nomi, zero cognomi per privacy)
+  /// Bank C: Anagrafico — Solo Nomi di battesimo (128 nomi, zero cognomi per privacy)
   names,
 
-  /// ModalitÃ  combinata: selezione dinamica deterministica del banco basata sull'hash energetico
+  /// Modalità combinata: selezione dinamica deterministica del banco basata sull'hash energetico
   rotational,
 }
 
@@ -57,10 +56,10 @@ class VocalTriggerEvent {
   /// Z-Score di attivazione al momento del trigger
   final double zScore;
 
-  /// Delta EMF rispetto alla baseline (ÂµT)
+  /// Delta EMF rispetto alla baseline (µT)
   final double deltaEmf;
 
-  /// Accelerazione dinamica al momento del trigger (m/sÂ²)
+  /// Accelerazione dinamica al momento del trigger (m/s²)
   final double dynamicAccel;
 
   /// Timestamp dell'emissione
@@ -77,7 +76,7 @@ class VocalTriggerEvent {
 
   @override
   String toString() =>
-      'VocalTriggerEvent("${bank.label}:$word", Z=${zScore.toStringAsFixed(2)}, Î”EMF=${deltaEmf.toStringAsFixed(1)}ÂµT)';
+      'VocalTriggerEvent("${bank.label}:$word", Z=${zScore.toStringAsFixed(2)}, ΔEMF=${deltaEmf.toStringAsFixed(1)}µT)';
 }
 
 /// Motore Vocale Custom "Real-Trigger" Multi-Bank Deterministico (Zero-AI / Zero-Random)
@@ -86,7 +85,7 @@ class VocalTriggerEvent {
 /// - Bank A: MetrologyLexicon.words (128 termini fisici/ambientali)
 /// - Bank B: InvestigativeLexicon.words (128 termini investigativi sul campo)
 /// - Bank C: NamesLexicon.words (128 soli nomi di battesimo, zero cognomi a tutela privacy)
-/// - ModalitÃ  Rotational: rotazione deterministica tra i banchi basata sull'energia reale dei sensori.
+/// - Modalità Rotational: rotazione deterministica tra i banchi basata sull'energia reale dei sensori.
 class VocalTriggerEngine {
   /// Stato globale di abilitazione del modulo vocale (spento di default)
   bool isEnabled;
@@ -94,10 +93,10 @@ class VocalTriggerEngine {
   /// Banco lessicale attualmente selezionato
   VocalLexiconBank currentBank;
 
-  /// Soglia minima di deviazione statistica (|Z| >= 3.0Ïƒ)
+  /// Soglia minima di deviazione statistica (|Z| >= 3.0σ)
   final double zScoreThreshold;
 
-  /// Soglia minima assoluta di scostamento EMF (ÂµT)
+  /// Soglia minima assoluta di scostamento EMF (µT)
   final double minDeltaEmf;
 
   /// Tempo di persistenza minima dell'anomalia prima di convalidare l'emissione (ms)
@@ -126,7 +125,7 @@ class VocalTriggerEngine {
     this.cooldownMs = 7000,
   });
 
-  /// Dizionario Bank A predefinito per retrocompatibilitÃ  con test e logica legacy
+  /// Dizionario Bank A predefinito per retrocompatibilità con test e logica legacy
   static const List<String> lexicon = MetrologyLexicon.words;
 
   /// Restituisce la lista di parole per il banco specificato
@@ -165,9 +164,9 @@ class VocalTriggerEngine {
 
   /// Valutazione deterministica in tempo reale con supporto Multi-Bank.
   /// Ritorna [VocalTriggerEvent] solo se:
-  /// 1. Il modulo Ã¨ abilitato (isEnabled == true).
-  /// 2. Il periodo di cooldown (6-10s) Ã¨ trascorso.
-  /// 3. L'anomalia (|Z| >= soglia e |Î”EMF| >= soglia) persiste da almeno [minPersistenceMs] (150ms).
+  /// 1. Il modulo è abilitato (isEnabled == true).
+  /// 2. Il periodo di cooldown (6-10s) è trascorso.
+  /// 3. L'anomalia (|Z| >= soglia e |ΔEMF| >= soglia) persiste da almeno [minPersistenceMs] (150ms).
   VocalTriggerEvent? evaluate({
     required DateTime now,
     required double deltaEmf,

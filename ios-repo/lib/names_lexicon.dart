@@ -1,4 +1,4 @@
-/// Bank C: Dizionario Anagrafico â€” Solo Nomi di Battesimo (128 nomi)
+/// Bank C: Dizionario Anagrafico — Solo Nomi di Battesimo (128 nomi)
 /// Rigorosa selezione di soli nomi propri tradizionali italiani.
 /// CATEGORICAMENTE ESCLUSO qualsiasi cognome a totale tutela della privacy.
 class NamesLexicon {

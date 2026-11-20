@@ -240,7 +240,7 @@ class BaselineEngine {
     _activeProfile = BaselineProfile(
       calibratedAt: now,
       duration: prev?.duration ?? Duration.zero,
-      totalSamples: (prev?.totalSamples ?? 0) + 1,
+      totalSamples: prev?.totalSamples ?? 0,
       emfMean: currentEmfMagnitude,
       emfStdDev: stdDev,
       emfMin: prev != null ? min(prev.emfMin, currentEmfMagnitude) : currentEmfMagnitude,

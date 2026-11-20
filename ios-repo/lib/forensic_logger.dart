@@ -299,7 +299,7 @@ class ForensicSessionLogger {
     final data = {
       'header': {
         'tool': 'AetherScan-Pro',
-        'engine': 'Scientific Forensic Logger v27-beta2.8',
+        'engine': 'Scientific Forensic Logger v27-beta3.0',
         'session_id': sessionId,
         'session_start': sessionStart.toIso8601String(),
         'total_entries': _entries.length,

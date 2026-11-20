@@ -12,7 +12,6 @@ import CoreMotion
   private let licenseKey        = "aetherscan_pro_license"
   private let synth             = AVSpeechSynthesizer()
   private var audioPlayer       : AVAudioPlayer?
-  private var creepyPlayer      : AVAudioPlayer?
   private var staticPlayer      : AVAudioPlayer?
   private var isStaticPlaying   = false
   private var channelRegistered = false
@@ -120,15 +119,10 @@ import CoreMotion
         result(self.computeHwid())
 
       case "getSavedLicense":
-        let v = UserDefaults.standard.string(forKey: self.licenseKey) ?? ""
-        self.log("getSavedLicense -> \(v.isEmpty ? "VUOTA" : "OK (\(v.count) chars)")")
-        result(v)
+        // App 100% gratuita e offline standalone
+        result("FREE_OFFLINE_STANDALONE")
 
       case "saveLicense":
-        let k = (call.arguments as? [String: Any])?["licenseKey"] as? String ?? ""
-        UserDefaults.standard.set(k, forKey: self.licenseKey)
-        UserDefaults.standard.synchronize()
-        self.log("saveLicense -> \(k.count) chars salvati")
         result(true)
 
       case "setVolume":
@@ -164,10 +158,6 @@ import CoreMotion
 
       case "playEmfAlert":
         self.playEmfAlert()
-        result(true)
-
-      case "playCreepyLaugh":
-        self.playCreepyLaugh()
         result(true)
 
       case "setWakeLock":
@@ -559,40 +549,6 @@ EMF baseline: \(String(format: "%.1f", emfBaseline)) uT
     var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
     _ = data.withUnsafeBytes { CC_MD5($0.baseAddress, CC_LONG(data.count), &digest) }
     return digest.map { String(format: "%02x", $0) }.joined()
-  }
-
-  // ──────────────────────────────────────────────────────────────────
-  // Riproduzione Suono Risata Inquietante (Creepy Laugh)
-  // ──────────────────────────────────────────────────────────────────
-  private func playCreepyLaugh() {
-    DispatchQueue.main.async { [weak self] in
-      guard let self = self else { return }
-      try? AVAudioSession.sharedInstance().setActive(true)
-
-      var soundURL: URL?
-      if let url = Bundle.main.url(forResource: "creepy_laugh", withExtension: "mp3") {
-        soundURL = url
-      } else if let key = FlutterDartProject.lookupKey(forAsset: "assets/audio/creepy_laugh.mp3") as String?,
-                let path = Bundle.main.path(forResource: key, ofType: nil) {
-        soundURL = URL(fileURLWithPath: path)
-      }
-
-      guard let url = soundURL else {
-        self.log("creepy_laugh.mp3 non trovato nel bundle, fallback chime")
-        self.playChime()
-        return
-      }
-
-      do {
-        self.creepyPlayer = try AVAudioPlayer(contentsOf: url)
-        self.creepyPlayer?.volume = self.scaledMasterGain()
-        self.creepyPlayer?.prepareToPlay()
-        let ok = self.creepyPlayer?.play() ?? false
-        self.log("playCreepyLaugh -> play()=\(ok)")
-      } catch {
-        self.log("playCreepyLaugh errore: \(error.localizedDescription)")
-      }
-    }
   }
 
   // ──────────────────────────────────────────────────────────────────

@@ -37,7 +37,6 @@ class MainActivity : FlutterActivity(), SensorEventListener {
     private var isStaticPlaying = false
     private var staticCoupling: Float = 0.0f
     private var staticPitchHz: Float = 600.0f
-    private var creepyMediaPlayer: MediaPlayer? = null
     private var tts: TextToSpeech? = null
     private var isTtsReady = false
     private var masterVolume: Float = 0.85f
@@ -85,13 +84,10 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                     result.success(hwid)
                 }
                 "getSavedLicense" -> {
-                    val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    result.success(prefs.getString(PREF_KEY_LICENSE, "") ?: "")
+                    // App 100% gratuita e offline standalone
+                    result.success("FREE_OFFLINE_STANDALONE")
                 }
                 "saveLicense" -> {
-                    val keyToSave = call.argument<String>("licenseKey") ?: ""
-                    getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        .edit().putString(PREF_KEY_LICENSE, keyToSave).apply()
                     result.success(true)
                 }
                 "playModulatedStatic" -> {
@@ -121,10 +117,6 @@ class MainActivity : FlutterActivity(), SensorEventListener {
                 "playChime" -> { playChimeSound(); result.success(true) }
                 "playProximityAlert" -> { playProximityAlert(); result.success(true) }
                 "playEmfAlert" -> { playEmfAlert(); result.success(true) }
-                "playCreepyLaugh" -> {
-                    playCreepyLaughSound()
-                    result.success(true)
-                }
                 "startStatic" -> {
                     val vol = call.argument<Double>("volume")
                     if (vol != null) {
@@ -190,17 +182,11 @@ class MainActivity : FlutterActivity(), SensorEventListener {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedKey = prefs.getString(PREF_KEY_LICENSE, "") ?: ""
-        val proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)
-        val magSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-        val accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
         return """
 === DIAGNOSTICA AETHERSCAN (ANDROID) ===
 Channel registrato: true
 Volume Stream Music: $currentVol / $maxVol
-Licenza salvata: ${if (savedKey.isEmpty()) "NO" else "SI (${savedKey.length} chars)"}
+Licenza: 100% Gratuita / Illimitata (Offline Standalone)
 Prossimita: ${if (proximitySensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
 Magnetometro (EMF): ${if (magSensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
 Sensore Tocco (Accel): ${if (accelSensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
@@ -328,46 +314,6 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-
-    // ──────────────────────────────────────────────────────────────────
-    // Riproduzione Suono Risata Inquietante (Creepy Laugh)
-    // ──────────────────────────────────────────────────────────────────
-    private fun playCreepyLaughSound() {
-        thread {
-            try {
-                creepyMediaPlayer?.release()
-                creepyMediaPlayer = null
-
-                // Prova 1: Risorsa nativa raw
-                val resId = resources.getIdentifier("creepy_laugh", "raw", packageName)
-                if (resId != 0) {
-                    creepyMediaPlayer = MediaPlayer.create(this@MainActivity, resId)
-                }
-
-                // Prova 2: Asset Flutter
-                if (creepyMediaPlayer == null) {
-                    val afd: AssetFileDescriptor = assets.openFd("flutter_assets/assets/audio/creepy_laugh.mp3")
-                    creepyMediaPlayer = MediaPlayer().apply {
-                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                        prepare()
-                    }
-                    afd.close()
-                }
-
-                creepyMediaPlayer?.apply {
-                    setAudioStreamType(AudioManager.STREAM_MUSIC)
-                    setVolume(masterVolume, masterVolume)
-                    setOnCompletionListener { mp ->
-                        mp.release()
-                        creepyMediaPlayer = null
-                    }
-                    start()
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
 
     // ──────────────────────────────────────────────────────────────────
     // Audio Sintetico (Beep / Chime / Prossimità / EMF)
@@ -559,8 +505,6 @@ EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.
             tts?.shutdown()
             tts = null
         } catch (e: Exception) { e.printStackTrace() }
-        creepyMediaPlayer?.release()
-        creepyMediaPlayer = null
         super.onDestroy()
     }
 }
