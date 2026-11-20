@@ -182,14 +182,18 @@ class MainActivity : FlutterActivity(), SensorEventListener {
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        // Check sensor availability via sensorManager
+        val proximityAvailable = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY) != null
+        val magAvailable = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) != null
+        val accelAvailable = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null
         return """
 === DIAGNOSTICA AETHERSCAN (ANDROID) ===
 Channel registrato: true
 Volume Stream Music: $currentVol / $maxVol
 Licenza: 100% Gratuita / Illimitata (Offline Standalone)
-Prossimita: ${if (proximitySensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
-Magnetometro (EMF): ${if (magSensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
-Sensore Tocco (Accel): ${if (accelSensor != null) "DISPONIBILE" else "NON DISPONIBILE"}
+Prossimita: ${if (proximityAvailable) "DISPONIBILE" else "NON DISPONIBILE"}
+Magnetometro (EMF): ${if (magAvailable) "DISPONIBILE" else "NON DISPONIBILE"}
+Sensore Tocco (Accel): ${if (accelAvailable) "DISPONIBILE" else "NON DISPONIBILE"}
 EMF Baseline: ${if (emfBaseline < 0) "-1.0" else String.format(java.util.Locale.US, "%.1f", emfBaseline)} uT
 """.trimIndent()
     }
