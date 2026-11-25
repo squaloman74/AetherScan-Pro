@@ -61,7 +61,10 @@ import CoreMotion
     return result
   }
 
-  @objc private func onAppBecameActive() { registerChannel() }
+  @objc private func onAppBecameActive() {
+    UIApplication.shared.isIdleTimerDisabled = true
+    registerChannel()
+  }
 
   public func registerChannelIfNeeded() { registerChannel() }
 
@@ -207,6 +210,18 @@ import CoreMotion
         result(true)
 
       default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    // ── MethodChannel (wakelock) ──
+    let wakeCh = FlutterMethodChannel(name: "aetherscan/wakelock", binaryMessenger: vc.binaryMessenger)
+    wakeCh.setMethodCallHandler { call, result in
+      if call.method == "setWakeLock" {
+        let on = (call.arguments as? [String: Any])?["enabled"] as? Bool ?? true
+        DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = on }
+        result(true)
+      } else {
         result(FlutterMethodNotImplemented)
       }
     }
@@ -646,3 +661,4 @@ EMF baseline: \(String(format: "%.1f", emfBaseline)) uT
     withUnsafeBytes(of: UInt16(v).littleEndian) { Array($0) }
   }
 }
+

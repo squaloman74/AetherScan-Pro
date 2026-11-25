@@ -98,6 +98,19 @@ class SpectralSweepEngine {
   double get currentFrequency => _currentFreq;
   double get lorenzX => _lx;
 
+  // Allarme radio al tocco (finestra temporale deterministica in ms)
+  DateTime? _touchAlarmUntil;
+  static const int touchAlarmDurationMs = 650;
+
+  bool isTouchAlarmActive(DateTime now) {
+    final until = _touchAlarmUntil;
+    return until != null && now.isBefore(until);
+  }
+
+  void triggerTouchAlarm(DateTime now) {
+    _touchAlarmUntil = now.add(const Duration(milliseconds: touchAlarmDurationMs));
+  }
+
   void setBand(SweepBand newBand) {
     if (band == newBand) return;
     band = newBand;
@@ -197,9 +210,11 @@ class SpectralSweepEngine {
     final double signalDbm = rawDbm.clamp(-120.0, -20.0);
     final int sUnit        = ((signalDbm + 127.0) / 6.0).clamp(1.0, 9.0).toInt();
 
-    // 3. Fattore di coupling sensoriale [0.0 – 1.0]
-    final double coupling = min(1.0, (zScoreEmf.abs() / 4.0) + (dynamicAccel / 3.0));
-    final bool isModulated = zScoreEmf.abs() >= 1.5 || dynamicAccel >= 0.5;
+    // 3. Fattore di coupling sensoriale [0.0 – 1.0] + impulso allarme radio al tocco
+    final bool touchAlarm = isTouchAlarmActive(now);
+    final double alarmBoost = touchAlarm ? 0.55 : 0.0;
+    final double coupling = min(1.0, (zScoreEmf.abs() / 4.0) + (dynamicAccel / 3.5) + alarmBoost);
+    final bool isModulated = zScoreEmf.abs() >= 1.5 || dynamicAccel >= 0.6 || touchAlarm;
 
     // 4. Parametri DSP ricavati dai sensori
     // Frequenza portante eterodina: dalla sintonia corrente + deviazione EMF
@@ -303,3 +318,4 @@ class SpectralSweepEngine {
     );
   }
 }
+

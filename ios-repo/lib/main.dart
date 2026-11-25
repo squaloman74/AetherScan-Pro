@@ -61,7 +61,7 @@ class IndustrialMetrologyScreen extends StatefulWidget {
   State<IndustrialMetrologyScreen> createState() => _IndustrialMetrologyScreenState();
 }
 
-class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
+class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> with WidgetsBindingObserver {
   static const _audioChannel = MethodChannel('com.aetherscan.pro/audio');
   static const _sensorChannel = EventChannel('com.aetherscan.pro/sensors');
 
@@ -109,9 +109,26 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   late final VocalTriggerEngine _vocalTriggerEngine;
   VocalTriggerEvent? _lastVocalEvent;
 
+  static const MethodChannel _wakeLockChannel = MethodChannel('aetherscan/wakelock');
+
+  Future<void> _setWakeLock(bool enabled) async {
+    try {
+      await _wakeLockChannel.invokeMethod<void>('setWakeLock', {'enabled': enabled});
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _setWakeLock(true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _setWakeLock(true);
 
     final now = DateTime.now();
     final sessionId = 'ASPRO-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toRadixString(16).toUpperCase()}';
@@ -179,6 +196,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _setWakeLock(false);
     _stopSweepAudio();
     _baselineEngine.onCancelled = null;
     _baselineEngine.onProgress = null;
@@ -306,6 +325,10 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
 
     final res = _triggerEngine.evaluate(reading);
+
+    if (res.shouldTriggerAlarmSound || res.isMechanicalTouch) {
+      _spectralSweepEngine.triggerTouchAlarm(reading.timestamp);
+    }
 
     // Allarmi sonori e registrazione forense scattano SOLO se Metrology Monitoring è espressamente attivo
     if (_isMetrologyMonitoringActive) {
@@ -1649,4 +1672,6 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
   }
 }
+
+
 
