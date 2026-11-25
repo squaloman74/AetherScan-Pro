@@ -1,8 +1,6 @@
 name: Build AetherScan Pro Android (APK) - v27-beta3.0
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -50,3 +48,4 @@ jobs:
         with:
           name: AetherScan-Pro-v27-beta3.0-Android-APK
           path: android/release-android/*.apk
+
