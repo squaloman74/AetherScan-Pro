@@ -61,7 +61,7 @@ class IndustrialMetrologyScreen extends StatefulWidget {
   State<IndustrialMetrologyScreen> createState() => _IndustrialMetrologyScreenState();
 }
 
-class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
+class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> with WidgetsBindingObserver {
   static const _audioChannel = MethodChannel('com.aetherscan.pro/audio');
   static const _sensorChannel = EventChannel('com.aetherscan.pro/sensors');
 
@@ -109,9 +109,26 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
   late final VocalTriggerEngine _vocalTriggerEngine;
   VocalTriggerEvent? _lastVocalEvent;
 
+  static const MethodChannel _wakeLockChannel = MethodChannel('aetherscan/wakelock');
+
+  Future<void> _setWakeLock(bool enabled) async {
+    try {
+      await _wakeLockChannel.invokeMethod<void>('setWakeLock', {'enabled': enabled});
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _setWakeLock(true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _setWakeLock(true);
 
     final now = DateTime.now();
     final sessionId = 'ASPRO-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toRadixString(16).toUpperCase()}';
@@ -179,6 +196,8 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _setWakeLock(false);
     _stopSweepAudio();
     _baselineEngine.onCancelled = null;
     _baselineEngine.onProgress = null;
@@ -306,6 +325,10 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
 
     final res = _triggerEngine.evaluate(reading);
+
+    if (res.shouldTriggerAlarmSound || res.isMechanicalTouch) {
+      _spectralSweepEngine.triggerTouchAlarm(reading.timestamp);
+    }
 
     // Allarmi sonori e registrazione forense scattano SOLO se Metrology Monitoring è espressamente attivo
     if (_isMetrologyMonitoringActive) {
@@ -847,6 +870,16 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
   }
 
+  Rect? _resolveShareOrigin() {
+    if (!mounted) return null;
+    final renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize && renderObject.size.width > 0 && renderObject.size.height > 0) {
+      final offset = renderObject.localToGlobal(Offset.zero);
+      return offset & renderObject.size;
+    }
+    return const Rect.fromLTWH(0, 0, 1, 1);
+  }
+
   Future<void> _exportCsvModal() async {
     final csv = _forensicLogger.exportCsv();
     try {
@@ -859,6 +892,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'text/csv')],
         subject: 'AetherScan-Pro — Log Forense CSV',
+        sharePositionOrigin: _resolveShareOrigin(),
       );
     } catch (_) {
       // Fallback: copia negli appunti
@@ -879,6 +913,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/json')],
         subject: 'AetherScan-Pro — Log Forense JSON',
+        sharePositionOrigin: _resolveShareOrigin(),
       );
     } catch (_) {
       Clipboard.setData(ClipboardData(text: jsonStr));
@@ -1649,4 +1684,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> {
     );
   }
 }
+
+
+
 

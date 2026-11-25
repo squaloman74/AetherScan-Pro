@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -72,7 +72,6 @@
 	</array>
 	<key>NSMotionUsageDescription</key>
 	<string>AetherScan Pro usa il magnetometro per rilevare anomalie del campo elettromagnetico (sensore EVP/EMF).</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>AetherScan Pro usa il microfono per l'analisi spettrale DSP in tempo reale del segnale ambientale nella modalità AM/FM Spectral Sweep.</string>
 </dict>
 </plist>
+

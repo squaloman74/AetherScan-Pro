@@ -37,6 +37,7 @@ class WelfordAccumulator {
 
   /// Inserimento di un nuovo campione nel flusso
   void update(double value) {
+    if (value.isNaN || value.isInfinite) return;
     _count++;
     if (value < _min) _min = value;
     if (value > _max) _max = value;
@@ -313,3 +314,4 @@ class BaselineEngine {
     _status = CalibrationStatus.idle;
   }
 }
+

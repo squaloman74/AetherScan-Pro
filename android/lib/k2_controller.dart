@@ -2,33 +2,54 @@ import 'package:flutter/foundation.dart';
 
 /// Controller Modulare Indipendente per il K2 Field Meter (Zero-AI / Deterministico)
 /// =================================================================================
-/// Separa e isola totalmente la gestione del K2 dal motore dei trigger e dai log.
-/// Risponde direttamente al flusso magnetico in microTesla (µT) e calcola in tempo reale
-/// il delta e l'attivazione progressiva dei 5 segmenti LED fisici.
+/// Separa e isola la gestione del K2 dal motore dei trigger e dai log.
+/// Applica smoothing e deadband per evitare oscillazioni quando il telefono e appoggiato
+/// o impugnato, mantenendo reattivita ai campi elettronici fino alla saturazione (5 LED).
 class K2Controller extends ChangeNotifier {
   double _currentEmf = 42.0;
+  double _smoothedEmf = 42.0;
   double _baselineEmf = 42.0;
   bool _isAutoTared = false;
   bool _isActive = false;
 
-  K2Controller({double initialBaseline = 42.0, bool initiallyActive = false})
-      : _currentEmf = initialBaseline,
+  // Fattore EMA (0..1): piu basso = piu stabile/smorzato contro picchi impulsivi
+  final double smoothingAlpha;
+
+  // Zona morta (deadband in uT): assorbe micro-rumore di fondo e leggere oscillazioni in mano
+  final double deadbandUt;
+
+  K2Controller({
+    double initialBaseline = 42.0,
+    bool initiallyActive = false,
+    this.smoothingAlpha = 1.0,
+    this.deadbandUt = 0.0,
+  })  : _currentEmf = initialBaseline,
+        _smoothedEmf = initialBaseline,
         _baselineEmf = initialBaseline,
         _isActive = initiallyActive;
 
   double get currentEmf => _currentEmf;
   double get baselineEmf => _baselineEmf;
-  double get deltaEmf => _isActive ? _currentEmf - _baselineEmf : 0.0;
   bool get isAutoTared => _isAutoTared;
   bool get isActive => _isActive;
 
-  /// Scala classica K-II EMF Meter a 5 segmenti LED (in base a |ΔEMF| in µT):
-  /// - 0 LED: Strumento inattivo / Standby
-  /// - LED 1: Normale / Fondo (< 1.5 µT) -> Verde NORM (spia sempre attiva a regime)
-  /// - LED 2: Fluttuazione Bassa (1.5 - 2.5 µT) -> Verde Chiaro LOW
-  /// - LED 3: Anomalia Misurabile (2.5 - 10.0 µT) -> Giallo MID
-  /// - LED 4: Campo Elevato (10.0 - 20.0 µT) -> Ambra HIGH
-  /// - LED 5: Picco Massimo / Saturazione (>= 20.0 µT) -> Rosso MAX
+  /// Delta EMF filtrato e con deadband applicata per stabilizzare i LED
+  double get deltaEmf {
+    if (!_isActive) return 0.0;
+    final rawDiff = _smoothedEmf - _baselineEmf;
+    final absDiff = rawDiff.abs();
+    if (absDiff <= deadbandUt) return 0.0;
+    final sign = rawDiff >= 0 ? 1.0 : -1.0;
+    return sign * (absDiff - deadbandUt);
+  }
+
+  /// Scala a 5 segmenti LED bilanciata:
+  /// - 0 LED: Standby
+  /// - LED 1: Normale / Appoggiato o mano ferma (< 2.5 uT netti dopo deadband) -> Verde NORM
+  /// - LED 2: Variazione lieve (2.5 - 6.0 uT) -> Verde Chiaro LOW
+  /// - LED 3: Campo misurabile (6.0 - 15.0 uT) -> Giallo MID
+  /// - LED 4: Campo elevato (15.0 - 30.0 uT) -> Ambra HIGH
+  /// - LED 5: Campo elettronico forte / Saturazione (>= 30.0 uT) -> Rosso MAX
   int get activeLedCount {
     if (!_isActive) return 0;
     final mag = deltaEmf.abs();
@@ -39,44 +60,40 @@ class K2Controller extends ChangeNotifier {
     return 1;
   }
 
-  /// Ingestione diretta del campione magnetometrico reale (chiamata a ogni frame del sensore)
   void ingestRawEmf(double rawMagnitude) {
     if (rawMagnitude.isNaN || rawMagnitude.isInfinite || rawMagnitude <= 0.0) return;
 
     _currentEmf = rawMagnitude;
+    _smoothedEmf = (_smoothedEmf * (1.0 - smoothingAlpha)) + (rawMagnitude * smoothingAlpha);
 
-    // Se il K2 è in standby, memorizza l'ultima lettura senza alterare la tara
     if (!_isActive) {
       notifyListeners();
       return;
     }
 
-    // Auto-tara iniziale trasparente al primissimo valore reale ricevuto dal sensore da attivo
     if (!_isAutoTared) {
-      _baselineEmf = rawMagnitude;
+      _baselineEmf = _smoothedEmf;
       _isAutoTared = true;
     }
 
     notifyListeners();
   }
 
-  /// Attiva il K2 Meter ed esegue la tara immediata sul valore EMF attuale
   void activate() {
     if (_isActive) return;
     _isActive = true;
-    _baselineEmf = _currentEmf;
+    _smoothedEmf = _currentEmf;
+    _baselineEmf = _smoothedEmf;
     _isAutoTared = true;
     notifyListeners();
   }
 
-  /// Disattiva il K2 Meter (stato Standby / 0 LED attivi)
   void deactivate() {
     if (!_isActive) return;
     _isActive = false;
     notifyListeners();
   }
 
-  /// Inverte lo stato di attivazione del K2
   void toggleActive() {
     if (_isActive) {
       deactivate();
@@ -85,21 +102,24 @@ class K2Controller extends ChangeNotifier {
     }
   }
 
-  /// Esegue la tara rapida manuale (Zero-Calibration) fissando il valore attuale come nuovo zero
   void tare([double? newReference]) {
     if (!_isActive) {
-      // Se era spento, la tara lo attiva sul valore richiesto
       _isActive = true;
     }
-    _baselineEmf = newReference ?? _currentEmf;
+    final ref = newReference ?? _smoothedEmf;
+    _smoothedEmf = ref;
+    _baselineEmf = ref;
     _isAutoTared = true;
     notifyListeners();
   }
 
-  /// Reset della tara alla baseline di riferimento predefinita
   void reset([double defaultReference = 42.0]) {
+    _currentEmf = defaultReference;
+    _smoothedEmf = defaultReference;
     _baselineEmf = defaultReference;
     _isAutoTared = false;
     notifyListeners();
   }
 }
+
+

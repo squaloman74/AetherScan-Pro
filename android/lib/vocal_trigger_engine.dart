@@ -175,8 +175,13 @@ class VocalTriggerEngine {
     required double lorenzX,
     required double currentFrequency,
   }) {
-    // 1. Blindatura: se spento, ritorna immediatamente senza calcoli
-    if (!isEnabled) {
+    // 1. Blindatura: se spento o input non finito, ritorna immediatamente senza calcoli
+    if (!isEnabled ||
+        !deltaEmf.isFinite ||
+        !zScoreEmf.isFinite ||
+        !dynamicAccel.isFinite ||
+        !lorenzX.isFinite ||
+        !currentFrequency.isFinite) {
       _anomalyStartTime = null;
       return null;
     }
@@ -259,3 +264,4 @@ class VocalTriggerEngine {
     return event;
   }
 }
+

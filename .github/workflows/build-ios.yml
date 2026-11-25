@@ -1,9 +1,12 @@
 name: Build AetherScan Pro iOS (IPA) - v27-beta3.0
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag di rilascio per la GitHub Release'
+        required: false
+        default: 'v27-beta3.0'
 
 jobs:
   build:
@@ -52,7 +55,7 @@ jobs:
       - name: Create GitHub Release with v27-beta3.0 IPA
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v27-beta3.0
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
           name: "AetherScan Pro v27-beta3.0 — Release iOS (IPA Unsigned)"
           body: |
             ## AetherScan Pro v2.0.30 (v27-beta3.0, Build 300) — Release iOS
@@ -67,3 +70,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

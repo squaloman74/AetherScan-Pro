@@ -870,6 +870,16 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> w
     );
   }
 
+  Rect? _resolveShareOrigin() {
+    if (!mounted) return null;
+    final renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize && renderObject.size.width > 0 && renderObject.size.height > 0) {
+      final offset = renderObject.localToGlobal(Offset.zero);
+      return offset & renderObject.size;
+    }
+    return const Rect.fromLTWH(0, 0, 1, 1);
+  }
+
   Future<void> _exportCsvModal() async {
     final csv = _forensicLogger.exportCsv();
     try {
@@ -882,6 +892,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> w
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'text/csv')],
         subject: 'AetherScan-Pro — Log Forense CSV',
+        sharePositionOrigin: _resolveShareOrigin(),
       );
     } catch (_) {
       // Fallback: copia negli appunti
@@ -902,6 +913,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> w
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/json')],
         subject: 'AetherScan-Pro — Log Forense JSON',
+        sharePositionOrigin: _resolveShareOrigin(),
       );
     } catch (_) {
       Clipboard.setData(ClipboardData(text: jsonStr));
@@ -1672,6 +1684,7 @@ class _IndustrialMetrologyScreenState extends State<IndustrialMetrologyScreen> w
     );
   }
 }
+
 
 
 
