@@ -21,8 +21,8 @@ class K2Controller extends ChangeNotifier {
   K2Controller({
     double initialBaseline = 42.0,
     bool initiallyActive = false,
-    this.smoothingAlpha = 0.22,
-    this.deadbandUt = 1.2,
+    this.smoothingAlpha = 1.0,
+    this.deadbandUt = 0.0,
   })  : _currentEmf = initialBaseline,
         _smoothedEmf = initialBaseline,
         _baselineEmf = initialBaseline,
@@ -53,10 +53,10 @@ class K2Controller extends ChangeNotifier {
   int get activeLedCount {
     if (!_isActive) return 0;
     final mag = deltaEmf.abs();
-    if (mag >= 30.0) return 5;
-    if (mag >= 15.0) return 4;
-    if (mag >= 6.0) return 3;
-    if (mag >= 2.5) return 2;
+    if (mag >= 20.0) return 5;
+    if (mag >= 10.0) return 4;
+    if (mag >= 2.5) return 3;
+    if (mag >= 1.5) return 2;
     return 1;
   }
 
@@ -121,3 +121,5 @@ class K2Controller extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+
